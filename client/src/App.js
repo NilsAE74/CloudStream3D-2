@@ -79,14 +79,15 @@ function App() {
     
     // Recalculate statistics for filtered data
     if (filtered.length > 0) {
+      // Use reduce for large arrays to avoid stack overflow
       const newStats = {
         count: filtered.length,
-        minX: Math.min(...filtered.map(p => p.x)),
-        maxX: Math.max(...filtered.map(p => p.x)),
-        minY: Math.min(...filtered.map(p => p.y)),
-        maxY: Math.max(...filtered.map(p => p.y)),
-        minZ: Math.min(...filtered.map(p => p.z)),
-        maxZ: Math.max(...filtered.map(p => p.z)),
+        minX: filtered.reduce((min, p) => Math.min(min, p.x), Infinity),
+        maxX: filtered.reduce((max, p) => Math.max(max, p.x), -Infinity),
+        minY: filtered.reduce((min, p) => Math.min(min, p.y), Infinity),
+        maxY: filtered.reduce((max, p) => Math.max(max, p.y), -Infinity),
+        minZ: filtered.reduce((min, p) => Math.min(min, p.z), Infinity),
+        maxZ: filtered.reduce((max, p) => Math.max(max, p.z), -Infinity),
       };
       setStatistics(newStats);
     }

@@ -114,8 +114,9 @@ function RightPanel({
     
     if (allZValues.length === 0) return null;
 
-    const minZ = Math.min(...allZValues);
-    const maxZ = Math.max(...allZValues);
+    // Use reduce for large arrays to avoid stack overflow with spread operator
+    const minZ = allZValues.reduce((min, val) => Math.min(min, val), Infinity);
+    const maxZ = allZValues.reduce((max, val) => Math.max(max, val), -Infinity);
     const range = maxZ - minZ;
     const binCount = 20;
     const binSize = range / binCount;

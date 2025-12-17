@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useCallback } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Box, Typography, Paper } from '@mui/material';
 import ToolBar from '../ToolBar/ToolBar';
@@ -24,11 +24,20 @@ const PointCloud = React.memo(function PointCloud({ points, colorMode, statistic
 
   // Create point cloud geometry and material
   const { geometry, material } = useMemo(() => {
-    if (!points || points.length === 0) return { geometry: null, material: null };
+    if (!points || points.length === 0) {
+      console.log('[PointCloud] No points to render');
+      return { geometry: null, material: null };
+    }
 
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(points.length * 3);
-    const colors = new Float32Array(points.length * 3);
+    console.log(`[PointCloud] Creating geometry for ${points.length.toLocaleString()} points`);
+    const startTime = performance.now();
+
+    try {
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(points.length * 3);
+      const colors = new Float32Array(points.length * 3);
+      
+      console.log(`[PointCloud] Allocated Float32Array buffers: ${((positions.length + colors.length) * 4 / 1024 / 1024).toFixed(2)} MB`);
 
     // Find Z range for color mapping with percentile cutoffs
     let zValues = points.map(p => p.z).sort((a, b) => a - b);
@@ -41,56 +50,98 @@ const PointCloud = React.memo(function PointCloud({ points, colorMode, statistic
     const zMax = zValues[Math.min(highCutoffIndex, zValues.length - 1)] || zValues[zValues.length - 1];
     const zRange = zMax - zMin || 1;
 
-    // Parse custom color if provided
-    let customColor = null;
-    if (color) {
-      customColor = new THREE.Color(color);
-    }
-
-    points.forEach((point, i) => {
-      positions[i * 3] = point.x;
-      positions[i * 3 + 1] = point.y;
-      positions[i * 3 + 2] = point.z;
-
-      // Color based on mode
-      if (customColor) {
-        // Use custom color for this file
-        colors[i * 3] = customColor.r;
-        colors[i * 3 + 1] = customColor.g;
-        colors[i * 3 + 2] = customColor.b;
-      } else if (colorMode === 'height') {
-        // Color based on Z value (elevation) with gamma correction
-        let t = Math.max(0, Math.min(1, (point.z - zMin) / zRange));
-        
-        // Apply gamma/power curve
-        t = Math.pow(t, colorGamma);
-        
-        // Blue (low) to Red (high) gradient
-        colors[i * 3] = t; // R
-        colors[i * 3 + 1] = 1 - Math.abs(t - 0.5) * 2; // G
-        colors[i * 3 + 2] = 1 - t; // B
-      } else {
-        // Uniform color
-        colors[i * 3] = 0.5;
-        colors[i * 3 + 1] = 0.8;
-        colors[i * 3 + 2] = 1.0;
+      // Parse custom color if provided
+      let customColor = null;
+      if (color) {
+        customColor = new THREE.Color(color);
       }
-    });
 
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.computeBoundingSphere();
+      // Populate buffers - optimized loop
+      for (let i = 0; i < points.length; i++) {
+        const point = points[i];
+        const idx3 = i * 3;
+        
+        // Set positions
+        positions[idx3] = point.x;
+        positions[idx3 + 1] = point.y;
+        positions[idx3 + 2] = point.z;
 
-    const material = new THREE.PointsMaterial({
-      size: pointSize || 0.1,
-      vertexColors: true,
-      sizeAttenuation: true,
-      transparent: false,
-      opacity: 1.0,
-    });
+        // Set colors based on mode
+        if (customColor) {
+          // Use custom color for this file
+          colors[idx3] = customColor.r;
+          colors[idx3 + 1] = customColor.g;
+          colors[idx3 + 2] = customColor.b;
+        } else if (colorMode === 'height') {
+          // Color based on Z value (elevation) with gamma correction
+          let t = Math.max(0, Math.min(1, (point.z - zMin) / zRange));
+          
+          // Apply gamma/power curve
+          t = Math.pow(t, colorGamma);
+          
+          // Blue (low) to Red (high) gradient
+          colors[idx3] = t; // R
+          colors[idx3 + 1] = 1 - Math.abs(t - 0.5) * 2; // G
+          colors[idx3 + 2] = 1 - t; // B
+        } else {
+          // Uniform color
+          colors[idx3] = 0.5;
+          colors[idx3 + 1] = 0.8;
+          colors[idx3 + 2] = 1.0;
+        }
+      }
+      
+      console.log(`[PointCloud] Populated ${points.length.toLocaleString()} positions and colors`);
 
-    return { geometry, material };
-  }, [points, colorMode, statistics, color, pointSize, colorGamma, colorPercentileLow, colorPercentileHigh]);
+      // Set attributes on geometry
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      
+      console.log(`[PointCloud] Computing bounding sphere...`);
+      geometry.computeBoundingSphere();
+
+      const material = new THREE.PointsMaterial({
+        size: pointSize || 0.1,
+        vertexColors: true,
+        sizeAttenuation: true,
+        transparent: false,
+        opacity: 1.0,
+      });
+
+      const endTime = performance.now();
+      const duration = (endTime - startTime).toFixed(2);
+      console.log(`[PointCloud] ✓ Geometry created successfully!`);
+      console.log(`[PointCloud]   - Points: ${points.length.toLocaleString()}`);
+      console.log(`[PointCloud]   - Time: ${duration}ms`);
+      console.log(`[PointCloud]   - Buffer sizes: positions=${positions.length.toLocaleString()}, colors=${colors.length.toLocaleString()}`);
+      console.log(`[PointCloud]   - Memory estimate: ~${((positions.length * 4 + colors.length * 4) / 1024 / 1024).toFixed(2)} MB`);
+      
+      // Warn if this is a large point cloud
+      if (points.length > 1000000) {
+        console.warn(`[PointCloud] ⚠️  Large point cloud (${(points.length / 1000000).toFixed(1)}M points) may impact performance`);
+      }
+
+      return { geometry, material };
+    } catch (error) {
+      console.error('[PointCloud] ❌ Failed to create geometry:', error);
+      console.error(`[PointCloud] Error details: ${error.message}`);
+      return { geometry: null, material: null };
+    }
+  }, [points, colorMode, color, pointSize, colorGamma, colorPercentileLow, colorPercentileHigh]);
+
+  // Cleanup effect to dispose geometry and material when component unmounts
+  React.useEffect(() => {
+    return () => {
+      if (geometry) {
+        console.log('[PointCloud] Disposing geometry');
+        geometry.dispose();
+      }
+      if (material) {
+        console.log('[PointCloud] Disposing material');
+        material.dispose();
+      }
+    };
+  }, [geometry, material]);
 
   if (!geometry || !material) return null;
 
@@ -209,6 +260,24 @@ function CenterPanel({
   filteringActive
 }) {
   const [cameraReset, setCameraReset] = React.useState(0);
+  
+  // Log render information
+  React.useEffect(() => {
+    console.log('\n=== CenterPanel Render Update ===');
+    if (visibleFiles && visibleFiles.length > 0) {
+      console.log(`Visible files: ${visibleFiles.length}`);
+      visibleFiles.forEach((file, idx) => {
+        console.log(`  [${idx}] ${file.name}: ${file.data.points.length.toLocaleString()} points`);
+      });
+      const totalPoints = visibleFiles.reduce((sum, f) => sum + f.data.points.length, 0);
+      console.log(`Total points across all files: ${totalPoints.toLocaleString()}`);
+    } else if (points) {
+      console.log(`Single point cloud: ${points.length.toLocaleString()} points`);
+    } else {
+      console.log('No point data to render');
+    }
+    console.log('=================================\n');
+  }, [points, visibleFiles]);
   
   // Define distinct colors for each file
   const fileColors = ['#2196f3', '#f50057', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4'];

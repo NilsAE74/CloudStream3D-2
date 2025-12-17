@@ -47,8 +47,12 @@ const upload = multer({
 // Parse XYZ/CSV file
 function parsePointCloudFile(filePath) {
   return new Promise((resolve, reject) => {
+    console.log(`[Parser] Reading file: ${path.basename(filePath)}`);
+    const parseStartTime = Date.now();
     const fileContent = fs.readFileSync(filePath, 'utf-8');
     const ext = path.extname(filePath).toLowerCase();
+    const fileSize = fileContent.length;
+    console.log(`[Parser] File size: ${(fileSize / 1024 / 1024).toFixed(2)} MB, Format: ${ext}`);
     
     let points = [];
     
@@ -70,6 +74,8 @@ function parsePointCloudFile(filePath) {
           }
         }
       }
+      const parseTime = Date.now() - parseStartTime;
+      console.log(`[Parser] Parsed ${points.length.toLocaleString()} points in ${parseTime}ms`);
       resolve(points);
     } else if (ext === '.csv') {
       // Parse CSV format
@@ -90,6 +96,8 @@ function parsePointCloudFile(filePath) {
             return null;
           }).filter(p => p !== null && !isNaN(p.x) && !isNaN(p.y) && !isNaN(p.z));
           
+          const parseTime = Date.now() - parseStartTime;
+          console.log(`[Parser] Parsed ${points.length.toLocaleString()} points from CSV in ${parseTime}ms`);
           resolve(points);
         },
         error: (error) => {
@@ -164,23 +172,34 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     const downsamplingEnabled = req.query.downsamplingEnabled === 'true';
     const MAX_DISPLAY_POINTS = parseInt(req.query.maxDisplayPoints) || 2500000;
     
-    console.log(`\n=== File Upload Processing ===`);
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`FILE UPLOAD PROCESSING`);
+    console.log(`${'='.repeat(60)}`);
     console.log(`File: ${req.file.originalname}`);
-    console.log(`Total points: ${points.length}`);
-    console.log(`Query params:`, req.query);
-    console.log(`Downsampling enabled: ${downsamplingEnabled}`);
-    console.log(`Max display points: ${MAX_DISPLAY_POINTS}`);
+    console.log(`File size: ${(req.file.size / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`Total points parsed: ${points.length.toLocaleString()}`);
+    console.log(`\nSettings:`);
+    console.log(`  - Downsampling enabled: ${downsamplingEnabled}`);
+    console.log(`  - Max display points: ${MAX_DISPLAY_POINTS.toLocaleString()}`);
     
     let downsamplingApplied = false;
     if (downsamplingEnabled && points.length > MAX_DISPLAY_POINTS) {
       const step = Math.ceil(points.length / MAX_DISPLAY_POINTS);
       displayPoints = points.filter((_, index) => index % step === 0);
       downsamplingApplied = true;
-      console.log(`✓ Downsampled to: ${displayPoints.length} points (step: ${step})`);
+      const ratio = ((displayPoints.length / points.length) * 100).toFixed(1);
+      console.log(`\n⚠️  DOWNSAMPLING APPLIED:`);
+      console.log(`  - Step size: ${step} (keeping every ${step}th point)`);
+      console.log(`  - Points after downsampling: ${displayPoints.length.toLocaleString()}`);
+      console.log(`  - Percentage retained: ${ratio}%`);
+      console.log(`  - Points removed: ${(points.length - displayPoints.length).toLocaleString()}`);
     } else {
-      console.log(`✓ No downsampling - displaying all ${points.length} points`);
+      console.log(`\n✓ No downsampling applied - sending all ${points.length.toLocaleString()} points`);
     }
-    console.log(`==============================\n`);
+    
+    const memoryEstimate = (displayPoints.length * 3 * 8) / 1024 / 1024; // 3 coords * 8 bytes per float64
+    console.log(`\nMemory estimate for display: ~${memoryEstimate.toFixed(2)} MB`);
+    console.log(`${'='.repeat(60)}\n`);
     
     res.json({
       filename: req.file.originalname,
