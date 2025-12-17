@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -11,7 +11,11 @@ import {
   Switch,
   FormControlLabel,
   Divider,
-  Alert
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   ExpandMore,
@@ -74,6 +78,8 @@ function RightPanel({
   setMaxDisplayPoints,
   downsamplingEnabled,
   setDownsamplingEnabled,
+  samplingAlgorithm,
+  setSamplingAlgorithm,
   colorGamma,
   setColorGamma,
   colorPercentileLow,
@@ -96,6 +102,10 @@ function RightPanel({
   // Local filter state
   const [localRanges, setLocalRanges] = useState(filterRanges || {});
   const [filteringActive, setFilteringActive] = useState(false);
+  
+  // Debounced slider state
+  const [sliderValue, setSliderValue] = useState(maxDisplayPoints);
+  const debounceTimerRef = useRef(null);
 
   // Update local ranges when filterRanges prop changes
   React.useEffect(() => {
@@ -110,6 +120,92 @@ function RightPanel({
       onLocalRangesChange(localRanges);
     }
   }, [localRanges, filteringActive, onLocalRangesChange]);
+  
+  // Sync slider value with maxDisplayPoints prop
+  useEffect(() => {
+    setSliderValue(maxDisplayPoints);
+  }, [maxDisplayPoints]);
+  
+  // Calculate total points from visible files or statistics
+  const totalPoints = useMemo(() => {
+    if (visibleFiles && visibleFiles.length > 0) {
+      return visibleFiles.reduce((sum, file) => sum + (file.points || 0), 0);
+    }
+    return statistics?.count || 0;
+  }, [visibleFiles, statistics]);
+  
+  // Calculate dynamic slider parameters based on total points
+  const sliderConfig = useMemo(() => {
+    if (totalPoints === 0) {
+      return {
+        min: 10000,
+        max: 5000000,
+        step: 100000,
+        marks: [
+          { value: 100000, label: '100k' },
+          { value: 1000000, label: '1M' },
+          { value: 2500000, label: '2.5M' },
+          { value: 5000000, label: '5M' }
+        ]
+      };
+    }
+    
+    const min = Math.max(10000, Math.floor(totalPoints * 0.01));
+    const max = totalPoints;
+    const step = Math.ceil(totalPoints / 100);
+    
+    // Generate marks dynamically
+    const marks = [];
+    marks.push({ value: min, label: `${(min / 1000).toFixed(0)}k` });
+    
+    if (totalPoints >= 1000000) {
+      const midPoints = [0.25, 0.5, 0.75].map(ratio => Math.floor(totalPoints * ratio));
+      midPoints.forEach(val => {
+        marks.push({ 
+          value: val, 
+          label: val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : `${(val / 1000).toFixed(0)}k` 
+        });
+      });
+    } else {
+      const quarter = Math.floor(totalPoints * 0.25);
+      const half = Math.floor(totalPoints * 0.5);
+      const threeQuarters = Math.floor(totalPoints * 0.75);
+      marks.push({ value: quarter, label: `${(quarter / 1000).toFixed(0)}k` });
+      marks.push({ value: half, label: `${(half / 1000).toFixed(0)}k` });
+      marks.push({ value: threeQuarters, label: `${(threeQuarters / 1000).toFixed(0)}k` });
+    }
+    
+    marks.push({ 
+      value: max, 
+      label: max >= 1000000 ? `${(max / 1000000).toFixed(1)}M` : `${(max / 1000).toFixed(0)}k` 
+    });
+    
+    return { min, max, step, marks };
+  }, [totalPoints]);
+  
+  // Debounced slider change handler
+  const handleSliderChange = useCallback((e, value) => {
+    setSliderValue(value); // Immediate UI update
+    
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Set new timer for debounced update
+    debounceTimerRef.current = setTimeout(() => {
+      setMaxDisplayPoints(value);
+    }, 400);
+  }, [setMaxDisplayPoints]);
+  
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // Calculate histogram data from all visible files
   const histogramData = useMemo(() => {
@@ -289,47 +385,67 @@ function RightPanel({
               />
             </Box>
 
-            {/* Downsampling Toggle */}
-            <Box sx={{ mb: 2 }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={downsamplingEnabled}
-                    onChange={(e) => setDownsamplingEnabled(e.target.checked)}
+            {/* Downsampling Controls - Only show when files are loaded */}
+            {(visibleFiles?.length > 0 || statistics?.count > 0) && (
+              <>
+                {/* Downsampling Toggle */}
+                <Box sx={{ mb: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={downsamplingEnabled}
+                        onChange={(e) => setDownsamplingEnabled(e.target.checked)}
+                      />
+                    }
+                    label="Enable Point Downsampling"
                   />
-                }
-                label="Enable Point Downsampling"
-              />
-              <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: '0.65rem', ml: 4 }}>
-                Automatically reduce points in large files for better performance
-              </Typography>
-            </Box>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: '0.65rem', ml: 4 }}>
+                    Automatically reduce points in large files for better performance
+                  </Typography>
+                </Box>
 
-            {/* Max Display Points Control */}
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Max Display Points
-              </Typography>
-              <Slider
-                value={maxDisplayPoints}
-                onChange={(e, value) => setMaxDisplayPoints(value)}
-                min={100000}
-                max={5000000}
-                step={100000}
-                valueLabelDisplay="auto"
-                valueLabelFormat={(value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : `${(value / 1000).toFixed(0)}k`}
-                marks={[
-                  { value: 100000, label: '100k' },
-                  { value: 1000000, label: '1M' },
-                  { value: 2500000, label: '2.5M' },
-                  { value: 5000000, label: '5M' }
-                ]}
-                disabled={!downsamplingEnabled}
-              />
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                Higher values may affect performance. Changes apply to newly loaded files.
-              </Typography>
-            </Box>
+                {/* Sampling Algorithm Selector */}
+                <Box sx={{ mb: 3 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Downsampling Algorithm</InputLabel>
+                    <Select
+                      value={samplingAlgorithm}
+                      onChange={(e) => setSamplingAlgorithm(e.target.value)}
+                      disabled={!downsamplingEnabled}
+                      label="Downsampling Algorithm"
+                    >
+                      <MenuItem value="simple">Simple (Every Nth point)</MenuItem>
+                      <MenuItem value="importance">Importance Sampling</MenuItem>
+                      <MenuItem value="poisson">Poisson Disk Sampling</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: '0.65rem', mt: 0.5 }}>
+                    Choose how points are selected when downsampling
+                  </Typography>
+                </Box>
+
+                {/* Max Display Points Control */}
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Max Display Points {totalPoints > 0 && `(File: ${totalPoints.toLocaleString()} points)`}
+                  </Typography>
+                  <Slider
+                    value={sliderValue}
+                    onChange={handleSliderChange}
+                    min={sliderConfig.min}
+                    max={sliderConfig.max}
+                    step={sliderConfig.step}
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : `${(value / 1000).toFixed(0)}k`}
+                    marks={sliderConfig.marks}
+                    disabled={!downsamplingEnabled}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                    Higher values may affect performance. Changes apply to newly loaded files.
+                  </Typography>
+                </Box>
+              </>
+            )}
 
             <Divider sx={{ my: 2 }} />
 

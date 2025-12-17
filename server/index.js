@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const Papa = require('papaparse');
 const { invertZ, shiftData, rotateData } = require('./utils/transformations');
+const { importanceSampling, poissonDiskSampling } = require('./utils/sampling');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -191,6 +192,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     // Get parameters from query string (more reliable than FormData body with multer)
     const downsamplingEnabled = req.query.downsamplingEnabled === 'true';
     const MAX_DISPLAY_POINTS = parseInt(req.query.maxDisplayPoints) || 2500000;
+    const samplingAlgorithm = req.query.samplingAlgorithm || 'simple';
     
     console.log(`\n${'='.repeat(60)}`);
     console.log(`FILE UPLOAD PROCESSING`);
@@ -201,18 +203,39 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     console.log(`\nSettings:`);
     console.log(`  - Downsampling enabled: ${downsamplingEnabled}`);
     console.log(`  - Max display points: ${MAX_DISPLAY_POINTS.toLocaleString()}`);
+    console.log(`  - Sampling algorithm: ${samplingAlgorithm}`);
     
     let downsamplingApplied = false;
     if (downsamplingEnabled && points.length > MAX_DISPLAY_POINTS) {
-      const step = Math.ceil(points.length / MAX_DISPLAY_POINTS);
-      displayPoints = points.filter((_, index) => index % step === 0);
       downsamplingApplied = true;
+      const samplingStartTime = Date.now();
+      
+      switch(samplingAlgorithm) {
+        case 'importance':
+          console.log(`\n⚠️  IMPORTANCE SAMPLING:`);
+          displayPoints = importanceSampling(points, MAX_DISPLAY_POINTS);
+          break;
+          
+        case 'poisson':
+          console.log(`\n⚠️  POISSON DISK SAMPLING:`);
+          displayPoints = poissonDiskSampling(points, MAX_DISPLAY_POINTS);
+          break;
+          
+        case 'simple':
+        default:
+          console.log(`\n⚠️  SIMPLE DOWNSAMPLING:`);
+          const step = Math.ceil(points.length / MAX_DISPLAY_POINTS);
+          displayPoints = points.filter((_, index) => index % step === 0);
+          console.log(`  - Step size: ${step} (keeping every ${step}th point)`);
+          break;
+      }
+      
+      const samplingTime = Date.now() - samplingStartTime;
       const ratio = ((displayPoints.length / points.length) * 100).toFixed(1);
-      console.log(`\n⚠️  DOWNSAMPLING APPLIED:`);
-      console.log(`  - Step size: ${step} (keeping every ${step}th point)`);
       console.log(`  - Points after downsampling: ${displayPoints.length.toLocaleString()}`);
       console.log(`  - Percentage retained: ${ratio}%`);
       console.log(`  - Points removed: ${(points.length - displayPoints.length).toLocaleString()}`);
+      console.log(`  - Sampling time: ${samplingTime}ms`);
     } else {
       console.log(`\n✓ No downsampling applied - sending all ${points.length.toLocaleString()} points`);
     }

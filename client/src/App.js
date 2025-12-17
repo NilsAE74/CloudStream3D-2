@@ -34,7 +34,8 @@ function App() {
   const [visibleFiles, setVisibleFiles] = useState([]);
   const [pointSize, setPointSize] = useState(0.1);
   const [maxDisplayPoints, setMaxDisplayPoints] = useState(2500000);
-  const [downsamplingEnabled, setDownsamplingEnabled] = useState(true);
+  const [downsamplingEnabled, setDownsamplingEnabled] = useState(false);
+  const [samplingAlgorithm, setSamplingAlgorithm] = useState('simple');
   
   // Color mapping controls
   const [colorGamma, setColorGamma] = useState(1.0);
@@ -156,6 +157,7 @@ function App() {
             onVisibleFilesChange={handleVisibleFilesChange}
             maxDisplayPoints={maxDisplayPoints}
             downsamplingEnabled={downsamplingEnabled}
+            samplingAlgorithm={samplingAlgorithm}
           />
         </Box>
 
@@ -202,6 +204,8 @@ function App() {
             setMaxDisplayPoints={setMaxDisplayPoints}
             downsamplingEnabled={downsamplingEnabled}
             setDownsamplingEnabled={setDownsamplingEnabled}
+            samplingAlgorithm={samplingAlgorithm}
+            setSamplingAlgorithm={setSamplingAlgorithm}
             colorGamma={colorGamma}
             setColorGamma={setColorGamma}
             colorPercentileLow={colorPercentileLow}

@@ -35,7 +35,7 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
-function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, downsamplingEnabled }) {
+function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, downsamplingEnabled, samplingAlgorithm }) {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
@@ -88,7 +88,8 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       // Send parameters as query string for reliability
       const params = new URLSearchParams({
         maxDisplayPoints: maxDisplayPoints || 2500000,
-        downsamplingEnabled: downsamplingEnabled ? 'true' : 'false'
+        downsamplingEnabled: downsamplingEnabled ? 'true' : 'false',
+        samplingAlgorithm: samplingAlgorithm || 'simple'
       });
 
       const response = await axios.post(`${API_URL}/api/upload?${params.toString()}`, formData, {
@@ -156,7 +157,7 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     } finally {
       setUploading(false);
     }
-  }, [onFileUploaded, maxDisplayPoints, downsamplingEnabled]);
+  }, [onFileUploaded, maxDisplayPoints, downsamplingEnabled, samplingAlgorithm]);
 
   // Handle drag events
   const handleDrag = useCallback((e) => {
