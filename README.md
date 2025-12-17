@@ -12,7 +12,7 @@ A modern web application for visualizing and processing XYZ point cloud data. Up
 
 ### Advanced Features
 - ✅ **Histogram Visualization**: Z-value distribution using Chart.js
-- ✅ **Measurement Tool**: Click two points to calculate 3D distance
+- 🔧 **Measurement Tool**: UI placeholder for point selection and distance calculation (requires future implementation)
 - ✅ **Data Export**: Export filtered datasets as CSV or XYZ format
 - ✅ **Data Transformations**:
   - Invert Z-values (toggle)

@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Papa = require('papaparse');
-const { transformData, invertZ, shiftData, rotateData } = require('./utils/transformations');
+const { invertZ, shiftData, rotateData } = require('./utils/transformations');
 
 const app = express();
 const PORT = process.env.PORT || 5000;

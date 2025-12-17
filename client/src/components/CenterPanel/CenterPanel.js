@@ -6,11 +6,7 @@ import ToolBar from '../ToolBar/ToolBar';
 import * as THREE from 'three';
 
 // Point Cloud Component
-function PointCloud({ points, colorMode, onPointClick, measurementMode, statistics }) {
-  const pointsRef = useRef();
-  const raycaster = useRef(new THREE.Raycaster());
-  const mouse = useRef(new THREE.Vector2());
-
+function PointCloud({ points, colorMode, statistics }) {
   // Create point cloud geometry and material
   const { geometry, material } = useMemo(() => {
     if (!points || points.length === 0) return { geometry: null, material: null };
@@ -58,28 +54,10 @@ function PointCloud({ points, colorMode, onPointClick, measurementMode, statisti
     return { geometry, material };
   }, [points, colorMode, statistics]);
 
-  // Handle click for measurement
-  const handleClick = (event) => {
-    if (!measurementMode || !pointsRef.current) return;
-
-    const canvas = event.target;
-    const rect = canvas.getBoundingClientRect();
-    mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.current.setFromCamera(mouse.current, event.camera);
-    const intersects = raycaster.current.intersectObject(pointsRef.current);
-
-    if (intersects.length > 0) {
-      const point = intersects[0].point;
-      onPointClick({ x: point.x, y: point.y, z: point.z });
-    }
-  };
-
   if (!geometry || !material) return null;
 
   return (
-    <points ref={pointsRef} geometry={geometry} material={material} onClick={handleClick} />
+    <points geometry={geometry} material={material} />
   );
 }
 
@@ -240,8 +218,6 @@ function CenterPanel({
           <PointCloud
             points={points}
             colorMode={colorMode}
-            onPointClick={onPointSelect}
-            measurementMode={measurementMode}
             statistics={statistics}
           />
         )}
