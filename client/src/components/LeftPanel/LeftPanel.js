@@ -80,10 +80,17 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
         data: response.data
       };
       
-      console.log(`File loaded: ${response.data.filename}`);
-      console.log(`Total points: ${response.data.totalPoints}`);
-      console.log(`Displayed points: ${response.data.displayedPoints}`);
+      console.log('\n=== File Upload Success ===');
+      console.log(`File: ${response.data.filename}`);
+      console.log(`Total points in file: ${response.data.totalPoints.toLocaleString()}`);
+      console.log(`Points sent to client: ${response.data.displayedPoints.toLocaleString()}`);
       console.log(`Downsampling applied: ${response.data.downsamplingApplied}`);
+      if (response.data.downsamplingApplied) {
+        const ratio = ((response.data.displayedPoints / response.data.totalPoints) * 100).toFixed(1);
+        console.log(`⚠️  Only ${ratio}% of points will be displayed`);
+        console.log(`Increase "Max Display Points" in settings to show more points`);
+      }
+      console.log('===========================\n');
       
       setFiles(prev => [...prev, newFile]);
       
@@ -107,7 +114,7 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     } finally {
       setUploading(false);
     }
-  }, [onFileUploaded]);
+  }, [onFileUploaded, downsamplingEnabled, maxDisplayPoints]);
 
   // Handle drag events
   const handleDrag = useCallback((e) => {
@@ -233,6 +240,18 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+      
+      {/* Downsampling Warning */}
+      {files.some(f => f.downsamplingApplied) && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <Typography variant="caption" display="block" fontWeight="bold">
+            Point Downsampling Active
+          </Typography>
+          <Typography variant="caption" display="block">
+            Some files show reduced points for performance. Increase "Max Display Points" in the right panel to show more points on next upload.
+          </Typography>
         </Alert>
       )}
 
