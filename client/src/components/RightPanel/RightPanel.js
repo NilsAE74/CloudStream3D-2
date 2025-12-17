@@ -52,7 +52,22 @@ function RightPanel({
   filterRanges, 
   onFilterChange, 
   onTransform,
-  selectedPoints
+  selectedPoints,
+  visibleFiles,
+  pointSize,
+  setPointSize,
+  maxDisplayPoints,
+  setMaxDisplayPoints,
+  downsamplingEnabled,
+  setDownsamplingEnabled,
+  colorGamma,
+  setColorGamma,
+  colorPercentileLow,
+  setColorPercentileLow,
+  colorPercentileHigh,
+  setColorPercentileHigh,
+  onFilteringActiveChange,
+  onLocalRangesChange
 }) {
   // Transformation state
   const [invertZ, setInvertZ] = useState(false);
@@ -66,6 +81,7 @@ function RightPanel({
 
   // Local filter state
   const [localRanges, setLocalRanges] = useState(filterRanges || {});
+  const [filteringActive, setFilteringActive] = useState(false);
 
   // Update local ranges when filterRanges prop changes
   React.useEffect(() => {
@@ -73,14 +89,33 @@ function RightPanel({
       setLocalRanges(filterRanges);
     }
   }, [filterRanges]);
+  
+  // Notify parent of local range changes for real-time visualization
+  React.useEffect(() => {
+    if (onLocalRangesChange && filteringActive) {
+      onLocalRangesChange(localRanges);
+    }
+  }, [localRanges, filteringActive, onLocalRangesChange]);
 
-  // Calculate histogram data
+  // Calculate histogram data from all visible files
   const histogramData = useMemo(() => {
-    if (!points || points.length === 0) return null;
+    let allZValues = [];
+    
+    // Collect Z values from all visible files
+    if (visibleFiles && visibleFiles.length > 0) {
+      visibleFiles.forEach(file => {
+        const fileZValues = file.data.points.map(p => p.z);
+        allZValues = allZValues.concat(fileZValues);
+      });
+    } else if (points && points.length > 0) {
+      // Fallback to single point cloud
+      allZValues = points.map(p => p.z);
+    }
+    
+    if (allZValues.length === 0) return null;
 
-    const zValues = points.map(p => p.z);
-    const minZ = Math.min(...zValues);
-    const maxZ = Math.max(...zValues);
+    const minZ = Math.min(...allZValues);
+    const maxZ = Math.max(...allZValues);
     const range = maxZ - minZ;
     const binCount = 20;
     const binSize = range / binCount;
@@ -93,7 +128,7 @@ function RightPanel({
       const binEnd = binStart + binSize;
       labels.push(binStart.toFixed(2));
       
-      zValues.forEach(z => {
+      allZValues.forEach(z => {
         if (z >= binStart && z < binEnd) {
           bins[i]++;
         }
@@ -101,7 +136,7 @@ function RightPanel({
     }
 
     // Last bin includes the max value
-    zValues.forEach(z => {
+    allZValues.forEach(z => {
       if (z === maxZ) {
         bins[binCount - 1]++;
       }
@@ -111,7 +146,7 @@ function RightPanel({
       labels,
       datasets: [
         {
-          label: 'Z-value Distribution',
+          label: `Z-value Distribution${visibleFiles && visibleFiles.length > 1 ? ` (${visibleFiles.length} files)` : ''}`,
           data: bins,
           backgroundColor: 'rgba(33, 150, 243, 0.6)',
           borderColor: 'rgba(33, 150, 243, 1)',
@@ -119,7 +154,7 @@ function RightPanel({
         },
       ],
     };
-  }, [points]);
+  }, [points, visibleFiles]);
 
   // Apply filters
   const handleApplyFilter = useCallback(() => {
@@ -209,6 +244,159 @@ function RightPanel({
       <Typography variant="h6" gutterBottom>
         Analysis & Controls
       </Typography>
+
+      {/* Display Controls */}
+      <Accordion defaultExpanded>
+        <AccordionSummary expandIcon={<ExpandMore />}>
+          <FilterAlt sx={{ mr: 1 }} />
+          <Typography>Display Settings</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Box>
+            {/* Point Size Control */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Point Size
+              </Typography>
+              <Slider
+                value={pointSize}
+                onChange={(e, value) => setPointSize(value)}
+                min={0.01}
+                max={1.0}
+                step={0.01}
+                valueLabelDisplay="auto"
+                marks={[
+                  { value: 0.01, label: '0.01' },
+                  { value: 0.1, label: '0.1' },
+                  { value: 0.5, label: '0.5' },
+                  { value: 1.0, label: '1.0' }
+                ]}
+              />
+            </Box>
+
+            {/* Downsampling Toggle */}
+            <Box sx={{ mb: 2 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={downsamplingEnabled}
+                    onChange={(e) => setDownsamplingEnabled(e.target.checked)}
+                  />
+                }
+                label="Enable Point Downsampling"
+              />
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: '0.65rem', ml: 4 }}>
+                Automatically reduce points in large files for better performance
+              </Typography>
+            </Box>
+
+            {/* Max Display Points Control */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Max Display Points
+              </Typography>
+              <Slider
+                value={maxDisplayPoints}
+                onChange={(e, value) => setMaxDisplayPoints(value)}
+                min={100000}
+                max={5000000}
+                step={100000}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : `${(value / 1000).toFixed(0)}k`}
+                marks={[
+                  { value: 100000, label: '100k' },
+                  { value: 1000000, label: '1M' },
+                  { value: 2500000, label: '2.5M' },
+                  { value: 5000000, label: '5M' }
+                ]}
+                disabled={!downsamplingEnabled}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                Higher values may affect performance. Changes apply to newly loaded files.
+              </Typography>
+            </Box>
+
+            <Divider sx={{ my: 2 }} />
+
+            {/* Color Mapping Controls */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Color Mapping
+              </Typography>
+              
+              {/* Gamma/Power Slider */}
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="caption" display="block" gutterBottom>
+                  Color Gradient Curve (Gamma)
+                </Typography>
+                <Slider
+                  value={colorGamma}
+                  onChange={(e, value) => setColorGamma(value)}
+                  min={0.1}
+                  max={3.0}
+                  step={0.1}
+                  valueLabelDisplay="auto"
+                  marks={[
+                    { value: 0.1, label: '0.1' },
+                    { value: 1.0, label: '1.0' },
+                    { value: 2.0, label: '2.0' },
+                    { value: 3.0, label: '3.0' }
+                  ]}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                  &lt; 1.0: More color in lower heights | &gt; 1.0: More color in higher heights
+                </Typography>
+              </Box>
+
+              {/* Percentile Cutoffs */}
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="caption" display="block" gutterBottom>
+                  Lower Percentile Cutoff (%)
+                </Typography>
+                <Slider
+                  value={colorPercentileLow}
+                  onChange={(e, value) => setColorPercentileLow(value)}
+                  min={0}
+                  max={25}
+                  step={1}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value) => `${value}%`}
+                  marks={[
+                    { value: 0, label: '0%' },
+                    { value: 5, label: '5%' },
+                    { value: 10, label: '10%' },
+                    { value: 25, label: '25%' }
+                  ]}
+                />
+              </Box>
+
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="caption" display="block" gutterBottom>
+                  Upper Percentile Cutoff (%)
+                </Typography>
+                <Slider
+                  value={colorPercentileHigh}
+                  onChange={(e, value) => setColorPercentileHigh(value)}
+                  min={0}
+                  max={25}
+                  step={1}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value) => `${value}%`}
+                  marks={[
+                    { value: 0, label: '0%' },
+                    { value: 5, label: '5%' },
+                    { value: 10, label: '10%' },
+                    { value: 25, label: '25%' }
+                  ]}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                  Ignore extreme values at top/bottom of height range
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        </AccordionDetails>
+      </Accordion>
 
       {/* Statistics Section */}
       <Accordion defaultExpanded>
@@ -314,7 +502,15 @@ function RightPanel({
 
       {/* Filtering Section */}
       {statistics && (
-        <Accordion>
+        <Accordion 
+          expanded={filteringActive}
+          onChange={(e, expanded) => {
+            setFilteringActive(expanded);
+            if (onFilteringActiveChange) {
+              onFilteringActiveChange(expanded);
+            }
+          }}
+        >
           <AccordionSummary expandIcon={<ExpandMore />}>
             <FilterAlt sx={{ mr: 1 }} />
             <Typography>Data Filtering</Typography>

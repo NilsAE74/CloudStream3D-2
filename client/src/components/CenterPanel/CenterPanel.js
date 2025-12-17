@@ -1,12 +1,27 @@
-import React, { useRef, useMemo } from 'react';
-import { Canvas } from '@react-three/fiber';
+import React, { useMemo, useRef, useCallback } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Box, Typography, Paper } from '@mui/material';
 import ToolBar from '../ToolBar/ToolBar';
 import * as THREE from 'three';
 
-// Point Cloud Component
-function PointCloud({ points, colorMode, statistics }) {
+// Point Cloud Component - Memoized for performance
+const PointCloud = React.memo(function PointCloud({ points, colorMode, statistics, color, pointSize, onPointClick, measurementMode, colorGamma = 1.0, colorPercentileLow = 0, colorPercentileHigh = 0 }) {
+  const meshRef = useRef();
+
+  // Handle click on point cloud
+  const handleClick = useCallback((event) => {
+    if (!measurementMode || !onPointClick || !meshRef.current) return;
+    
+    event.stopPropagation();
+    
+    // Get the intersected point index
+    const index = event.index;
+    if (index !== undefined && points[index]) {
+      onPointClick(points[index]);
+    }
+  }, [measurementMode, onPointClick, points]);
+
   // Create point cloud geometry and material
   const { geometry, material } = useMemo(() => {
     if (!points || points.length === 0) return { geometry: null, material: null };
@@ -15,10 +30,22 @@ function PointCloud({ points, colorMode, statistics }) {
     const positions = new Float32Array(points.length * 3);
     const colors = new Float32Array(points.length * 3);
 
-    // Find Z range for color mapping
-    const zMin = statistics?.minZ || Math.min(...points.map(p => p.z));
-    const zMax = statistics?.maxZ || Math.max(...points.map(p => p.z));
+    // Find Z range for color mapping with percentile cutoffs
+    let zValues = points.map(p => p.z).sort((a, b) => a - b);
+    
+    // Apply percentile cutoffs
+    const lowCutoffIndex = Math.floor(zValues.length * (colorPercentileLow / 100));
+    const highCutoffIndex = Math.ceil(zValues.length * (1 - colorPercentileHigh / 100));
+    
+    const zMin = zValues[lowCutoffIndex] || zValues[0];
+    const zMax = zValues[Math.min(highCutoffIndex, zValues.length - 1)] || zValues[zValues.length - 1];
     const zRange = zMax - zMin || 1;
+
+    // Parse custom color if provided
+    let customColor = null;
+    if (color) {
+      customColor = new THREE.Color(color);
+    }
 
     points.forEach((point, i) => {
       positions[i * 3] = point.x;
@@ -26,9 +53,18 @@ function PointCloud({ points, colorMode, statistics }) {
       positions[i * 3 + 2] = point.z;
 
       // Color based on mode
-      if (colorMode === 'height') {
-        // Color based on Z value (elevation)
-        const t = (point.z - zMin) / zRange;
+      if (customColor) {
+        // Use custom color for this file
+        colors[i * 3] = customColor.r;
+        colors[i * 3 + 1] = customColor.g;
+        colors[i * 3 + 2] = customColor.b;
+      } else if (colorMode === 'height') {
+        // Color based on Z value (elevation) with gamma correction
+        let t = Math.max(0, Math.min(1, (point.z - zMin) / zRange));
+        
+        // Apply gamma/power curve
+        t = Math.pow(t, colorGamma);
+        
         // Blue (low) to Red (high) gradient
         colors[i * 3] = t; // R
         colors[i * 3 + 1] = 1 - Math.abs(t - 0.5) * 2; // G
@@ -46,20 +82,28 @@ function PointCloud({ points, colorMode, statistics }) {
     geometry.computeBoundingSphere();
 
     const material = new THREE.PointsMaterial({
-      size: 0.1,
+      size: pointSize || 0.1,
       vertexColors: true,
       sizeAttenuation: true,
+      transparent: false,
+      opacity: 1.0,
     });
 
     return { geometry, material };
-  }, [points, colorMode, statistics]);
+  }, [points, colorMode, statistics, color, pointSize, colorGamma, colorPercentileLow, colorPercentileHigh]);
 
   if (!geometry || !material) return null;
 
   return (
-    <points geometry={geometry} material={material} />
+    <points 
+      ref={meshRef}
+      geometry={geometry} 
+      material={material}
+      onClick={handleClick}
+      frustumCulled={true}
+    />
   );
-}
+});
 
 // Measurement Line Component
 function MeasurementLine({ points }) {
@@ -117,7 +161,36 @@ function Grid({ statistics }) {
     </group>
   );
 }
-
+// Filter Box Component - Visualizes filter boundaries
+function FilterBox({ filterRanges, statistics, filteringActive }) {
+  if (!filterRanges || !statistics || !filteringActive) return null;
+  
+  const width = filterRanges.xMax - filterRanges.xMin;
+  const height = filterRanges.yMax - filterRanges.yMin;
+  const depth = filterRanges.zMax - filterRanges.zMin;
+  
+  const centerX = (filterRanges.xMax + filterRanges.xMin) / 2;
+  const centerY = (filterRanges.yMax + filterRanges.yMin) / 2;
+  const centerZ = (filterRanges.zMax + filterRanges.zMin) / 2;
+  
+  return (
+    <mesh position={[centerX, centerY, centerZ]}>
+      <boxGeometry args={[width, height, depth]} />
+      <meshBasicMaterial 
+        color="#00ff00" 
+        transparent 
+        opacity={0.1} 
+        wireframe={false}
+        side={THREE.DoubleSide}
+      />
+      {/* Add wireframe overlay for better visibility */}
+      <lineSegments>
+        <edgesGeometry args={[new THREE.BoxGeometry(width, height, depth)]} />
+        <lineBasicMaterial color="#00ff00" opacity={0.6} transparent />
+      </lineSegments>
+    </mesh>
+  );
+}
 function CenterPanel({ 
   points, 
   statistics, 
@@ -126,32 +199,80 @@ function CenterPanel({
   toggleMeasurementMode,
   selectedPoints,
   colorMode,
-  setColorMode
+  setColorMode,
+  visibleFiles,
+  pointSize,
+  colorGamma = 1.0,
+  colorPercentileLow = 0,
+  colorPercentileHigh = 0,
+  filterRanges,
+  filteringActive
 }) {
   const [cameraReset, setCameraReset] = React.useState(0);
+  
+  // Define distinct colors for each file
+  const fileColors = ['#2196f3', '#f50057', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4'];
+  
+  // Calculate combined statistics for all visible files
+  const combinedStatistics = useMemo(() => {
+    if (!visibleFiles || visibleFiles.length === 0) return statistics;
+    
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    let totalPoints = 0;
+    
+    visibleFiles.forEach(file => {
+      const stats = file.data.statistics;
+      minX = Math.min(minX, stats.minX);
+      maxX = Math.max(maxX, stats.maxX);
+      minY = Math.min(minY, stats.minY);
+      maxY = Math.max(maxY, stats.maxY);
+      minZ = Math.min(minZ, stats.minZ);
+      maxZ = Math.max(maxZ, stats.maxZ);
+      totalPoints += file.data.totalPoints;
+    });
+    
+    return { count: totalPoints, minX, maxX, minY, maxY, minZ, maxZ };
+  }, [visibleFiles, statistics]);
 
   // Calculate camera position based on point cloud bounds
   const cameraPosition = useMemo(() => {
-    if (!statistics) return [10, 10, 10];
+    const stats = combinedStatistics || statistics;
+    if (!stats) return [10, 10, 10];
 
-    const rangeX = statistics.maxX - statistics.minX;
-    const rangeY = statistics.maxY - statistics.minY;
-    const rangeZ = statistics.maxZ - statistics.minZ;
+    const rangeX = stats.maxX - stats.minX;
+    const rangeY = stats.maxY - stats.minY;
+    const rangeZ = stats.maxZ - stats.minZ;
     const maxRange = Math.max(rangeX, rangeY, rangeZ);
 
-    const distance = maxRange * 2;
-    return [distance, distance, distance];
-  }, [statistics]);
+    // Calculate center of the point cloud
+    const centerX = (stats.maxX + stats.minX) / 2;
+    const centerY = (stats.maxY + stats.minY) / 2;
+    const centerZ = (stats.maxZ + stats.minZ) / 2;
+
+    // Position camera at a distance to see the entire cloud
+    const distance = maxRange * 1.5;
+    
+    // Position camera from the side with Z-axis pointing up
+    // Camera looks from negative Y direction towards center
+    return [
+      centerX,
+      centerY - distance,
+      centerZ + distance * 0.5
+    ];
+  }, [combinedStatistics, statistics]);
 
   const targetPosition = useMemo(() => {
-    if (!statistics) return [0, 0, 0];
+    const stats = combinedStatistics || statistics;
+    if (!stats) return [0, 0, 0];
 
     return [
-      (statistics.maxX + statistics.minX) / 2,
-      (statistics.maxY + statistics.minY) / 2,
-      (statistics.maxZ + statistics.minZ) / 2
+      (stats.maxX + stats.minX) / 2,
+      (stats.maxY + stats.minY) / 2,
+      (stats.maxZ + stats.minZ) / 2
     ];
-  }, [statistics]);
+  }, [combinedStatistics, statistics]);
 
   const handleResetView = () => {
     setCameraReset(prev => prev + 1);
@@ -169,7 +290,7 @@ function CenterPanel({
       />
 
       {/* Info Overlay */}
-      {statistics && (
+      {(statistics || combinedStatistics) && (
         <Paper
           sx={{
             position: 'absolute',
@@ -181,45 +302,124 @@ function CenterPanel({
             zIndex: 10
           }}
         >
-          <Typography variant="caption" display="block">
-            Points: {points?.length.toLocaleString() || 0}
-          </Typography>
-          <Typography variant="caption" display="block">
-            Range X: {statistics.minX.toFixed(2)} to {statistics.maxX.toFixed(2)}
-          </Typography>
-          <Typography variant="caption" display="block">
-            Range Y: {statistics.minY.toFixed(2)} to {statistics.maxY.toFixed(2)}
-          </Typography>
-          <Typography variant="caption" display="block">
-            Range Z: {statistics.minZ.toFixed(2)} to {statistics.maxZ.toFixed(2)}
-          </Typography>
+          {visibleFiles && visibleFiles.length > 0 ? (
+            <>
+              <Typography variant="caption" display="block" fontWeight="bold">
+                Visible Files: {visibleFiles.length}
+              </Typography>
+              {visibleFiles.map((file, index) => (
+                <Typography 
+                  key={file.id} 
+                  variant="caption" 
+                  display="block"
+                  sx={{ color: fileColors[index % fileColors.length] }}
+                >
+                  • {file.name}: {file.points.toLocaleString()} pts
+                </Typography>
+              ))}
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                Range X: {combinedStatistics.minX.toFixed(2)} to {combinedStatistics.maxX.toFixed(2)}
+              </Typography>
+              <Typography variant="caption" display="block">
+                Range Y: {combinedStatistics.minY.toFixed(2)} to {combinedStatistics.maxY.toFixed(2)}
+              </Typography>
+              <Typography variant="caption" display="block">
+                Range Z: {combinedStatistics.minZ.toFixed(2)} to {combinedStatistics.maxZ.toFixed(2)}
+              </Typography>
+            </>
+          ) : (
+            <>
+              <Typography variant="caption" display="block">
+                Points: {points?.length.toLocaleString() || 0}
+              </Typography>
+              <Typography variant="caption" display="block">
+                Range X: {statistics.minX.toFixed(2)} to {statistics.maxX.toFixed(2)}
+              </Typography>
+              <Typography variant="caption" display="block">
+                Range Y: {statistics.minY.toFixed(2)} to {statistics.maxY.toFixed(2)}
+              </Typography>
+              <Typography variant="caption" display="block">
+                Range Z: {statistics.minZ.toFixed(2)} to {statistics.maxZ.toFixed(2)}
+              </Typography>
+            </>
+          )}
         </Paper>
       )}
 
       {/* 3D Canvas */}
-      <Canvas>
+      <Canvas
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: "high-performance",
+          stencil: false,
+          depth: true,
+        }}
+        dpr={window.devicePixelRatio || 1}
+        performance={{ min: 0.5 }}
+        frameloop="demand"
+      >
         <PerspectiveCamera 
           makeDefault 
           position={cameraPosition}
+          up={[0, 0, 1]}
           key={cameraReset}
         />
         <OrbitControls 
           target={targetPosition}
-          enableDamping
+          enableDamping={true}
           dampingFactor={0.05}
+          rotateSpeed={0.5}
+          zoomSpeed={0.8}
+          panSpeed={0.8}
+          minDistance={1}
+          maxDistance={10000}
+          minPolarAngle={0}
+          maxPolarAngle={Math.PI / 2}
+          screenSpacePanning={false}
+          makeDefault
         />
         
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 5]} intensity={0.5} />
         
-        {statistics && <Grid statistics={statistics} />}
+        {(combinedStatistics || statistics) && <Grid statistics={combinedStatistics || statistics} />}
         
-        {points && points.length > 0 && (
-          <PointCloud
-            points={points}
-            colorMode={colorMode}
-            statistics={statistics}
-          />
+        {/* Filter Box Visualization */}
+        <FilterBox filterRanges={filterRanges} statistics={statistics} filteringActive={filteringActive} />
+        
+        {/* Render multiple visible files */}
+        {visibleFiles && visibleFiles.length > 0 ? (
+          visibleFiles.map((file, index) => (
+            <PointCloud
+              key={file.id}
+              points={file.data.points}
+              colorMode={visibleFiles.length > 1 ? 'uniform' : colorMode}
+              statistics={file.data.statistics}
+              color={visibleFiles.length > 1 ? fileColors[index % fileColors.length] : null}
+              pointSize={pointSize}
+              onPointClick={onPointSelect}
+              measurementMode={measurementMode}
+              colorGamma={colorGamma}
+              colorPercentileLow={colorPercentileLow}
+              colorPercentileHigh={colorPercentileHigh}
+            />
+          ))
+        ) : (
+          /* Fallback to single point cloud */
+          points && points.length > 0 && (
+            <PointCloud
+              points={points}
+              colorMode={colorMode}
+              statistics={statistics}
+              pointSize={pointSize}
+              onPointClick={onPointSelect}
+              measurementMode={measurementMode}
+              colorGamma={colorGamma}
+              colorPercentileLow={colorPercentileLow}
+              colorPercentileHigh={colorPercentileHigh}
+            />
+          )
         )}
         
         {selectedPoints && selectedPoints.length > 0 && (
@@ -231,6 +431,30 @@ function CenterPanel({
           </>
         )}
       </Canvas>
+
+      {/* Measurement Instructions */}
+      {measurementMode && (
+        <Paper
+          sx={{
+            position: 'absolute',
+            bottom: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            p: 2,
+            bgcolor: 'rgba(30, 41, 59, 0.9)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 10
+          }}
+        >
+          <Typography variant="body2">
+            {selectedPoints.length === 0 
+              ? 'Click on a point in the cloud to start measurement'
+              : selectedPoints.length === 1
+              ? 'Click on a second point to measure distance'
+              : 'Measurement complete. Click measure button again to exit.'}
+          </Typography>
+        </Paper>
+      )}
 
       {/* Instructions */}
       {!points && (

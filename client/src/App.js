@@ -31,6 +31,19 @@ function App() {
   const [selectedPoints, setSelectedPoints] = useState([]);
   const [measurementMode, setMeasurementMode] = useState(false);
   const [colorMode, setColorMode] = useState('height'); // 'height' or 'uniform'
+  const [visibleFiles, setVisibleFiles] = useState([]);
+  const [pointSize, setPointSize] = useState(0.1);
+  const [maxDisplayPoints, setMaxDisplayPoints] = useState(2500000);
+  const [downsamplingEnabled, setDownsamplingEnabled] = useState(true);
+  
+  // Color mapping controls
+  const [colorGamma, setColorGamma] = useState(1.0);
+  const [colorPercentileLow, setColorPercentileLow] = useState(0);
+  const [colorPercentileHigh, setColorPercentileHigh] = useState(0);
+  
+  // Filter box visibility
+  const [filteringActive, setFilteringActive] = useState(false);
+  const [previewRanges, setPreviewRanges] = useState(null);
 
   // Handle file upload success
   const handleFileUploaded = useCallback((data) => {
@@ -116,6 +129,11 @@ function App() {
     setMeasurementMode(prev => !prev);
     setSelectedPoints([]);
   }, []);
+  
+  // Handle visible files change
+  const handleVisibleFilesChange = useCallback((files) => {
+    setVisibleFiles(files);
+  }, []);
 
   return (
     <ThemeProvider theme={theme}>
@@ -132,7 +150,12 @@ function App() {
           flexShrink: 0,
           borderRight: '1px solid rgba(255, 255, 255, 0.12)'
         }}>
-          <LeftPanel onFileUploaded={handleFileUploaded} />
+          <LeftPanel 
+            onFileUploaded={handleFileUploaded}
+            onVisibleFilesChange={handleVisibleFilesChange}
+            maxDisplayPoints={maxDisplayPoints}
+            downsamplingEnabled={downsamplingEnabled}
+          />
         </Box>
 
         {/* Center Panel - 3D Visualization */}
@@ -146,6 +169,13 @@ function App() {
             selectedPoints={selectedPoints}
             colorMode={colorMode}
             setColorMode={setColorMode}
+            visibleFiles={visibleFiles}
+            pointSize={pointSize}
+            colorGamma={colorGamma}
+            colorPercentileLow={colorPercentileLow}
+            colorPercentileHigh={colorPercentileHigh}
+            filterRanges={previewRanges || filterRanges}
+            filteringActive={filteringActive}
           />
         </Box>
 
@@ -164,6 +194,21 @@ function App() {
             onFilterChange={handleFilterChange}
             onTransform={handleTransform}
             selectedPoints={selectedPoints}
+            visibleFiles={visibleFiles}
+            pointSize={pointSize}
+            setPointSize={setPointSize}
+            maxDisplayPoints={maxDisplayPoints}
+            setMaxDisplayPoints={setMaxDisplayPoints}
+            downsamplingEnabled={downsamplingEnabled}
+            setDownsamplingEnabled={setDownsamplingEnabled}
+            colorGamma={colorGamma}
+            setColorGamma={setColorGamma}
+            colorPercentileLow={colorPercentileLow}
+            setColorPercentileLow={setColorPercentileLow}
+            colorPercentileHigh={colorPercentileHigh}
+            setColorPercentileHigh={setColorPercentileHigh}
+            onFilteringActiveChange={setFilteringActive}
+            onLocalRangesChange={setPreviewRanges}
           />
         </Box>
       </Box>

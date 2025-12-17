@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -9,7 +9,8 @@ import {
   ListItemText,
   CircularProgress,
   Alert,
-  IconButton
+  IconButton,
+  Checkbox
 } from '@mui/material';
 import {
   CloudUpload,
@@ -20,11 +21,20 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-function LeftPanel({ onFileUploaded }) {
+function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, downsamplingEnabled }) {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
+  const [visibleFiles, setVisibleFiles] = useState(new Set());
+  
+  // Notify parent whenever visibleFiles changes
+  useEffect(() => {
+    if (onVisibleFilesChange) {
+      const visibleFilesList = files.filter(f => visibleFiles.has(f.id));
+      onVisibleFilesChange(visibleFilesList);
+    }
+  }, [files, visibleFiles, onVisibleFilesChange]);
 
   // Handle file selection
   const handleFileSelect = useCallback(async (selectedFiles) => {
@@ -48,24 +58,48 @@ function LeftPanel({ onFileUploaded }) {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await axios.post(`${API_URL}/api/upload`, formData, {
+      // Send parameters as query string for reliability
+      const params = new URLSearchParams({
+        maxDisplayPoints: maxDisplayPoints || 2500000,
+        downsamplingEnabled: downsamplingEnabled ? 'true' : 'false'
+      });
+
+      const response = await axios.post(`${API_URL}/api/upload?${params.toString()}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
       // Add file to list
-      setFiles(prev => [...prev, {
+      const newFile = {
         id: response.data.fileId,
         name: response.data.filename,
         points: response.data.totalPoints,
+        displayedPoints: response.data.displayedPoints,
+        downsamplingApplied: response.data.downsamplingApplied,
         data: response.data
-      }]);
+      };
+      
+      console.log(`File loaded: ${response.data.filename}`);
+      console.log(`Total points: ${response.data.totalPoints}`);
+      console.log(`Displayed points: ${response.data.displayedPoints}`);
+      console.log(`Downsampling applied: ${response.data.downsamplingApplied}`);
+      
+      setFiles(prev => [...prev, newFile]);
+      
+      // Automatically make new file visible
+      setVisibleFiles(prev => {
+        const newVisible = new Set(prev);
+        newVisible.add(response.data.fileId);
+        return newVisible;
+      });
 
       // Notify parent component
       if (onFileUploaded) {
         onFileUploaded(response.data);
       }
+      
+      // useEffect will automatically call onVisibleFilesChange when visibleFiles updates
 
     } catch (err) {
       console.error('Upload error:', err);
@@ -107,6 +141,26 @@ function LeftPanel({ onFileUploaded }) {
   // Remove file from list
   const handleRemoveFile = useCallback((fileId) => {
     setFiles(prev => prev.filter(f => f.id !== fileId));
+    setVisibleFiles(prev => {
+      const newVisible = new Set(prev);
+      newVisible.delete(fileId);
+      return newVisible;
+    });
+    // useEffect will automatically call onVisibleFilesChange
+  }, []);
+  
+  // Toggle file visibility
+  const handleToggleVisibility = useCallback((fileId) => {
+    setVisibleFiles(prev => {
+      const newVisible = new Set(prev);
+      if (newVisible.has(fileId)) {
+        newVisible.delete(fileId);
+      } else {
+        newVisible.add(fileId);
+      }
+      return newVisible;
+    });
+    // useEffect will automatically call onVisibleFilesChange
   }, []);
 
   return (
@@ -210,10 +264,19 @@ function LeftPanel({ onFileUploaded }) {
                   </IconButton>
                 }
               >
+                <Checkbox
+                  checked={visibleFiles.has(file.id)}
+                  onChange={() => handleToggleVisibility(file.id)}
+                  sx={{ mr: 1 }}
+                />
                 <Description sx={{ mr: 2 }} />
                 <ListItemText
                   primary={file.name}
-                  secondary={`${file.points.toLocaleString()} points`}
+                  secondary={
+                    file.downsamplingApplied
+                      ? `${file.displayedPoints.toLocaleString()} / ${file.points.toLocaleString()} points (downsampled)`
+                      : `${file.points.toLocaleString()} points`
+                  }
                 />
               </ListItem>
             ))

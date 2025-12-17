@@ -31,7 +31,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+  limits: { 
+    fileSize: 100 * 1024 * 1024, // 100MB limit
+    fieldSize: 10 * 1024 * 1024  // 10MB for fields
+  },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ext !== '.csv' && ext !== '.xyz' && ext !== '.txt') {
@@ -156,11 +159,28 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     
     // For large datasets, downsample for initial display
     let displayPoints = points;
-    const MAX_DISPLAY_POINTS = 50000;
-    if (points.length > MAX_DISPLAY_POINTS) {
+    
+    // Get parameters from query string (more reliable than FormData body with multer)
+    const downsamplingEnabled = req.query.downsamplingEnabled === 'true';
+    const MAX_DISPLAY_POINTS = parseInt(req.query.maxDisplayPoints) || 2500000;
+    
+    console.log(`\n=== File Upload Processing ===`);
+    console.log(`File: ${req.file.originalname}`);
+    console.log(`Total points: ${points.length}`);
+    console.log(`Query params:`, req.query);
+    console.log(`Downsampling enabled: ${downsamplingEnabled}`);
+    console.log(`Max display points: ${MAX_DISPLAY_POINTS}`);
+    
+    let downsamplingApplied = false;
+    if (downsamplingEnabled && points.length > MAX_DISPLAY_POINTS) {
       const step = Math.ceil(points.length / MAX_DISPLAY_POINTS);
       displayPoints = points.filter((_, index) => index % step === 0);
+      downsamplingApplied = true;
+      console.log(`✓ Downsampled to: ${displayPoints.length} points (step: ${step})`);
+    } else {
+      console.log(`✓ No downsampling - displaying all ${points.length} points`);
     }
+    console.log(`==============================\n`);
     
     res.json({
       filename: req.file.originalname,
@@ -169,7 +189,8 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       allPoints: points.length <= MAX_DISPLAY_POINTS ? points : null,
       statistics,
       totalPoints: points.length,
-      displayedPoints: displayPoints.length
+      displayedPoints: displayPoints.length,
+      downsamplingApplied: downsamplingApplied
     });
   } catch (error) {
     console.error('Upload error:', error);
