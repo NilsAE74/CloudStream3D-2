@@ -38,30 +38,19 @@ function SineWaveSurface() {
     
     const step = SURFACE_SIZE / SURFACE_SEGMENTS;
     
-    let minZ = Infinity;
-    let maxZ = -Infinity;
+    // For sin(x) * cos(y) * WAVE_AMPLITUDE, the range is always [-WAVE_AMPLITUDE, WAVE_AMPLITUDE]
+    const minZ = -WAVE_AMPLITUDE;
+    const maxZ = WAVE_AMPLITUDE;
+    const zRange = maxZ - minZ;
     
-    // First pass: calculate all z values to find min/max
-    const zValues = [];
+    // Calculate positions and colors in a single pass
+    let idx = 0;
     for (let i = 0; i <= SURFACE_SEGMENTS; i++) {
       for (let j = 0; j <= SURFACE_SEGMENTS; j++) {
         const x = -SURFACE_SIZE / 2 + j * step;
         const y = -SURFACE_SIZE / 2 + i * step;
         const z = Math.sin(x * WAVE_FREQUENCY + time * ANIMATION_SPEED_X) * 
                   Math.cos(y * WAVE_FREQUENCY + time * ANIMATION_SPEED_Y) * WAVE_AMPLITUDE;
-        zValues.push(z);
-        minZ = Math.min(minZ, z);
-        maxZ = Math.max(maxZ, z);
-      }
-    }
-    
-    const zRange = maxZ - minZ || 1;
-    
-    // Second pass: set positions and colors
-    let idx = 0;
-    for (let i = 0; i <= SURFACE_SEGMENTS; i++) {
-      for (let j = 0; j <= SURFACE_SEGMENTS; j++) {
-        const z = zValues[idx];
         
         // Update position
         positions[idx * 3 + 2] = z;
