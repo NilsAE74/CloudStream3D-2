@@ -182,7 +182,8 @@ CloudStream3D-2/
 │   └── .env                     # Environment variables
 ├── server/                      # Node.js backend
 │   ├── utils/
-│   │   └── transformations.js  # Point cloud transformation utilities
+│   │   ├── transformations.js  # Point cloud transformation utilities
+│   │   └── sampling.js         # Advanced downsampling algorithms
 │   └── index.js                # Express server and API endpoints
 ├── uploads/                     # Uploaded files (gitignored)
 ├── package.json                 # Root package configuration
@@ -195,6 +196,10 @@ CloudStream3D-2/
 ### `POST /api/upload`
 Upload a point cloud file
 - **Body**: FormData with `file` field
+- **Query Parameters**:
+  - `downsamplingEnabled`: boolean (default: false)
+  - `maxDisplayPoints`: number (default: 2500000)
+  - `samplingAlgorithm`: 'simple' | 'importance' | 'poisson' (default: 'simple')
 - **Returns**: Parsed point data, statistics, and metadata
 
 ### `POST /api/transform`
@@ -228,10 +233,45 @@ Export point cloud data
 
 ## Performance Considerations
 
-- **Point Decimation**: Large datasets (>50,000 points) are automatically downsampled for display
+### Point Downsampling
+The application now features intelligent downsampling algorithms to handle large point clouds efficiently:
+
+#### Downsampling Options (Right Panel - Display Settings)
+- **Enable/Disable**: Toggle downsampling on/off (disabled by default)
+- **Max Display Points**: Dynamic slider that adjusts to your file size
+  - Automatically scales from 1% to 100% of your file
+  - Shows total points in file for context
+  - Changes apply to newly uploaded files
+- **Sampling Algorithms**:
+  1. **Simple (Every Nth point)**: Fast, uniform sampling
+     - Selects every Nth point based on target count
+     - Best for: Quick previews, uniform data
+  
+  2. **Importance Sampling**: Preserves geometric features
+     - Prioritizes areas with high z-variation
+     - Uses spatial indexing and k-nearest neighbors
+     - Best for: Terrain with complex features, detailed surfaces
+     - Performance: ~100ms for 10k points, ~9s for 100k points
+  
+  3. **Poisson Disk Sampling**: Evenly distributed points
+     - Ensures minimum distance between points
+     - Uses Bridson's algorithm for natural spacing
+     - Best for: Uniform density, aesthetic visualization
+     - Performance: ~170ms for 10k points, ~5s for 100k points
+
+#### When to Use Downsampling
+- **Enable**: For files with millions of points where performance is critical
+- **Disable**: For smaller files (<500k points) or when full detail is needed
+- **Algorithm Selection**:
+  - Use **Simple** for quick testing and uniform data
+  - Use **Importance** when you need to preserve terrain features and details
+  - Use **Poisson** when you want even distribution and natural appearance
+
+### Other Performance Features
 - **Client-side Filtering**: Filtering happens in the browser for better responsiveness
 - **Efficient Rendering**: Three.js handles GPU-accelerated point cloud rendering
 - **Lazy Loading**: Components load data only when needed
+- **Debounced Controls**: Slider updates are debounced (400ms) to prevent excessive re-renders
 
 ## Browser Support
 

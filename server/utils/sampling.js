@@ -122,8 +122,16 @@ function importanceSampling(points, targetCount, options = {}) {
   
   // Step 5: Weighted random sampling based on importance scores
   // Apply exponent to emphasize high-importance areas
-  const weights = importanceScores.map(score => Math.pow(score, importanceExponent));
+  // Add small epsilon to avoid zero weights
+  const epsilon = 0.001;
+  const weights = importanceScores.map(score => Math.pow(score + epsilon, importanceExponent));
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  
+  // Create array of indices with their weights
+  const indexWeightPairs = weights.map((weight, index) => ({ index, weight }));
+  
+  // Sort by weight descending for better sampling
+  indexWeightPairs.sort((a, b) => b.weight - a.weight);
   
   // Normalize weights to probabilities
   const probabilities = weights.map(w => w / totalWeight);
@@ -136,34 +144,53 @@ function importanceSampling(points, targetCount, options = {}) {
     cumulativeProb.push(cumSum);
   }
   
-  // Sample points using weighted random selection
+  // Sample points using weighted random selection with replacement prevention
   const sampledIndices = new Set();
   const sampledPoints = [];
   
-  // Ensure we don't get stuck in infinite loop
-  let attempts = 0;
-  const maxAttempts = targetCount * 10;
-  
-  while (sampledPoints.length < targetCount && attempts < maxAttempts) {
-    attempts++;
-    const rand = Math.random();
+  // If target is close to total points, use a simpler approach
+  if (targetCount >= points.length * 0.8) {
+    // Just return most important points
+    for (let i = 0; i < Math.min(targetCount, indexWeightPairs.length); i++) {
+      sampledPoints.push(points[indexWeightPairs[i].index]);
+    }
+  } else {
+    // Weighted random sampling
+    let attempts = 0;
+    const maxAttempts = targetCount * 20;
     
-    // Binary search for the index
-    let left = 0;
-    let right = cumulativeProb.length - 1;
-    while (left < right) {
-      const mid = Math.floor((left + right) / 2);
-      if (cumulativeProb[mid] < rand) {
-        left = mid + 1;
-      } else {
-        right = mid;
+    while (sampledPoints.length < targetCount && attempts < maxAttempts) {
+      attempts++;
+      const rand = Math.random();
+      
+      // Binary search for the index
+      let left = 0;
+      let right = cumulativeProb.length - 1;
+      while (left < right) {
+        const mid = Math.floor((left + right) / 2);
+        if (cumulativeProb[mid] < rand) {
+          left = mid + 1;
+        } else {
+          right = mid;
+        }
+      }
+      
+      const selectedIndex = left;
+      if (!sampledIndices.has(selectedIndex)) {
+        sampledIndices.add(selectedIndex);
+        sampledPoints.push(points[selectedIndex]);
       }
     }
     
-    const selectedIndex = left;
-    if (!sampledIndices.has(selectedIndex)) {
-      sampledIndices.add(selectedIndex);
-      sampledPoints.push(points[selectedIndex]);
+    // If we still don't have enough points, add highest importance ones
+    if (sampledPoints.length < targetCount) {
+      for (const { index } of indexWeightPairs) {
+        if (!sampledIndices.has(index)) {
+          sampledIndices.add(index);
+          sampledPoints.push(points[index]);
+          if (sampledPoints.length >= targetCount) break;
+        }
+      }
     }
   }
   
