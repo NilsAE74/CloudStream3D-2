@@ -1,5 +1,5 @@
-import React, { useRef, useMemo, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, { useRef, useMemo } from 'react';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Box, Typography, Paper } from '@mui/material';
 import ToolBar from '../ToolBar/ToolBar';
@@ -85,9 +85,9 @@ function PointCloud({ points, colorMode, onPointClick, measurementMode, statisti
 
 // Measurement Line Component
 function MeasurementLine({ points }) {
-  if (!points || points.length < 2) return null;
-
   const lineGeometry = useMemo(() => {
+    if (!points || points.length < 2) return null;
+    
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array([
       points[0].x, points[0].y, points[0].z,
@@ -96,6 +96,8 @@ function MeasurementLine({ points }) {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     return geometry;
   }, [points]);
+
+  if (!lineGeometry) return null;
 
   return (
     <line geometry={lineGeometry}>

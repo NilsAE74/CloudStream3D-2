@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Accordion,
   AccordionSummary,
@@ -121,14 +120,6 @@ function RightPanel({
       ],
     };
   }, [points]);
-
-  // Handle filter slider change
-  const handleSliderChange = useCallback((axis, type) => (event, newValue) => {
-    setLocalRanges(prev => ({
-      ...prev,
-      [`${axis}${type}`]: newValue
-    }));
-  }, []);
 
   // Apply filters
   const handleApplyFilter = useCallback(() => {
