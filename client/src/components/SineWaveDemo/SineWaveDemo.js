@@ -4,42 +4,51 @@ import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Box, Typography, Paper } from '@mui/material';
 import * as THREE from 'three';
 
+// Constants for sine wave surface
+const SURFACE_SIZE = 20;
+const SURFACE_SEGMENTS = 100;
+const ANIMATION_SPEED_X = 0.5;
+const ANIMATION_SPEED_Y = 0.3;
+const WAVE_AMPLITUDE = 2;
+const WAVE_FREQUENCY = 0.5;
+
 // Animated Sine Wave Surface Component
-function SineWaveSurface({ time }) {
+function SineWaveSurface() {
   const meshRef = useRef();
+  const timeRef = useRef(0);
   
   // Create the sine wave geometry
   const geometry = useMemo(() => {
-    const size = 20;
-    const segments = 100;
-    const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
-    
+    const geometry = new THREE.PlaneGeometry(SURFACE_SIZE, SURFACE_SIZE, SURFACE_SEGMENTS, SURFACE_SEGMENTS);
     return geometry;
   }, []);
 
-  // Update the geometry based on time for animation
-  useFrame(() => {
+  // Update the geometry based on time for animation using useFrame
+  useFrame((state, delta) => {
     if (!meshRef.current) return;
     if (!meshRef.current.geometry.attributes.position) return;
     if (!meshRef.current.geometry.attributes.color) return;
     
+    // Update time using the delta from useFrame for smooth animation
+    timeRef.current += delta;
+    const time = timeRef.current;
+    
     const positions = meshRef.current.geometry.attributes.position.array;
     const colors = meshRef.current.geometry.attributes.color.array;
     
-    const size = 20;
-    const segments = 100;
-    const step = size / segments;
+    const step = SURFACE_SIZE / SURFACE_SEGMENTS;
     
     let minZ = Infinity;
     let maxZ = -Infinity;
     
     // First pass: calculate all z values to find min/max
     const zValues = [];
-    for (let i = 0; i <= segments; i++) {
-      for (let j = 0; j <= segments; j++) {
-        const x = -size / 2 + j * step;
-        const y = -size / 2 + i * step;
-        const z = Math.sin(x * 0.5 + time * 0.5) * Math.cos(y * 0.5 + time * 0.3) * 2;
+    for (let i = 0; i <= SURFACE_SEGMENTS; i++) {
+      for (let j = 0; j <= SURFACE_SEGMENTS; j++) {
+        const x = -SURFACE_SIZE / 2 + j * step;
+        const y = -SURFACE_SIZE / 2 + i * step;
+        const z = Math.sin(x * WAVE_FREQUENCY + time * ANIMATION_SPEED_X) * 
+                  Math.cos(y * WAVE_FREQUENCY + time * ANIMATION_SPEED_Y) * WAVE_AMPLITUDE;
         zValues.push(z);
         minZ = Math.min(minZ, z);
         maxZ = Math.max(maxZ, z);
@@ -50,8 +59,8 @@ function SineWaveSurface({ time }) {
     
     // Second pass: set positions and colors
     let idx = 0;
-    for (let i = 0; i <= segments; i++) {
-      for (let j = 0; j <= segments; j++) {
+    for (let i = 0; i <= SURFACE_SEGMENTS; i++) {
+      for (let j = 0; j <= SURFACE_SEGMENTS; j++) {
         const z = zValues[idx];
         
         // Update position
@@ -78,8 +87,7 @@ function SineWaveSurface({ time }) {
   useEffect(() => {
     if (!geometry) return;
     
-    const segments = 100;
-    const count = (segments + 1) * (segments + 1);
+    const count = (SURFACE_SEGMENTS + 1) * (SURFACE_SEGMENTS + 1);
     const colors = new Float32Array(count * 3);
     
     for (let i = 0; i < count; i++) {
@@ -115,17 +123,7 @@ function ReferenceSphere() {
 
 // Main Demo Component
 function SineWaveDemo() {
-  const [time, setTime] = useState(0);
   const [cameraReset, setCameraReset] = useState(0);
-
-  // Animate time
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTime(t => t + 0.016); // ~60 FPS
-    }, 16);
-    
-    return () => clearInterval(interval);
-  }, []);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -281,7 +279,7 @@ function SineWaveDemo() {
         <axesHelper args={[12]} />
         
         {/* Animated Sine Wave Surface */}
-        <SineWaveSurface time={time} />
+        <SineWaveSurface />
         
         {/* Reference Sphere */}
         <ReferenceSphere />
