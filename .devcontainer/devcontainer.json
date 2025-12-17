@@ -1,0 +1,14 @@
+{
+  "name": "CloudStream3D-2",
+  "forwardPorts": [3000, 5000],
+  "portsAttributes": {
+    "3000": {
+      "label": "React Client",
+      "onAutoForward": "notify"
+    },
+    "5000": {
+      "label": "Express Server",
+      "onAutoForward": "notify"
+    }
+  }
+}

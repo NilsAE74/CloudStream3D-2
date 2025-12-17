@@ -19,7 +19,21 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Use environment variable or construct from window location in Codespaces
+const getApiUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  // Check if running in Codespaces
+  const hostname = window.location.hostname;
+  if (hostname.includes('app.github.dev')) {
+    // Replace port 3000 with 5000 in the hostname
+    return `https://${hostname.replace('-3000', '-5000')}`;
+  }
+  return 'http://localhost:5000';
+};
+
+const API_URL = getApiUrl();
 
 function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, downsamplingEnabled }) {
   const [files, setFiles] = useState([]);
@@ -51,6 +65,19 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       return;
     }
 
+    // Warn about file size limits in Codespaces
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 50) {
+      const confirmUpload = window.confirm(
+        `Warning: File size is ${fileSizeMB.toFixed(1)}MB. ` +
+        `Large files may fail to upload in GitHub Codespaces due to proxy limits. ` +
+        `For files over 50MB, consider running the app locally. Continue anyway?`
+      );
+      if (!confirmUpload) {
+        return;
+      }
+    }
+
     setUploading(true);
     setError(null);
 
@@ -68,6 +95,9 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 300000, // 5 minutes timeout for large files
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
       });
 
       // Add file to list
@@ -110,11 +140,23 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
 
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err.response?.data?.error || 'Failed to upload file. Please try again.');
+      
+      // Provide specific error messages
+      let errorMessage = 'Failed to upload file. Please try again.';
+      
+      if (err.response?.status === 413) {
+        errorMessage = 'File is too large for GitHub Codespaces. Please run the app locally for files over 50MB, or try a smaller file/sample.';
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. File may be too large for Codespaces proxy. Try a smaller file or run locally.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setUploading(false);
     }
-  }, [onFileUploaded, downsamplingEnabled, maxDisplayPoints]);
+  }, [onFileUploaded, maxDisplayPoints, downsamplingEnabled]);
 
   // Handle drag events
   const handleDrag = useCallback((e) => {
