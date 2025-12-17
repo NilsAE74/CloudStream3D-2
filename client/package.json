@@ -46,5 +46,21 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "overrides": {
+    "glob": "^9.3.5",
+    "rimraf": "^5.0.10",
+    "@babel/plugin-proposal-class-properties": "npm:@babel/plugin-transform-class-properties@^7.24.0",
+    "@babel/plugin-proposal-private-methods": "npm:@babel/plugin-transform-private-methods@^7.24.0",
+    "@babel/plugin-proposal-numeric-separator": "npm:@babel/plugin-transform-numeric-separator@^7.24.0",
+    "@babel/plugin-proposal-nullish-coalescing-operator": "npm:@babel/plugin-transform-nullish-coalescing-operator@^7.24.0",
+    "@babel/plugin-proposal-optional-chaining": "npm:@babel/plugin-transform-optional-chaining@^7.24.0",
+    "@babel/plugin-proposal-private-property-in-object": "npm:@babel/plugin-transform-private-property-in-object@^7.24.0",
+    "rollup-plugin-terser": "npm:@rollup/plugin-terser@^0.4.4",
+    "@humanwhocodes/config-array": "npm:@eslint/config-array@^0.19.1",
+    "@humanwhocodes/object-schema": "npm:@eslint/object-schema@^2.1.5",
+    "sourcemap-codec": "npm:@jridgewell/sourcemap-codec@^1.5.0",
+    "svgo": "^3.3.2",
+    "source-map": "^0.7.6"
   }
 }
