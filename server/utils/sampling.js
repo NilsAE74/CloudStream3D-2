@@ -3,6 +3,10 @@
  * @module sampling
  */
 
+// Constants for importance sampling
+const IMPORTANCE_EPSILON = 0.001; // Small value to avoid zero weights
+const MAX_SAMPLING_ATTEMPTS_MULTIPLIER = 20; // Maximum attempts = targetCount * this value
+
 /**
  * Importance Sampling Algorithm
  * Samples points based on local z-variation (importance score).
@@ -123,8 +127,7 @@ function importanceSampling(points, targetCount, options = {}) {
   // Step 5: Weighted random sampling based on importance scores
   // Apply exponent to emphasize high-importance areas
   // Add small epsilon to avoid zero weights
-  const epsilon = 0.001;
-  const weights = importanceScores.map(score => Math.pow(score + epsilon, importanceExponent));
+  const weights = importanceScores.map(score => Math.pow(score + IMPORTANCE_EPSILON, importanceExponent));
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
   
   // Create array of indices with their weights
@@ -157,7 +160,7 @@ function importanceSampling(points, targetCount, options = {}) {
   } else {
     // Weighted random sampling
     let attempts = 0;
-    const maxAttempts = targetCount * 20;
+    const maxAttempts = targetCount * MAX_SAMPLING_ATTEMPTS_MULTIPLIER;
     
     while (sampledPoints.length < targetCount && attempts < maxAttempts) {
       attempts++;
@@ -308,29 +311,57 @@ function poissonDiskSampling(points, targetCount, options = {}) {
   };
   
   // Helper function to find nearest point in dataset to target coordinates
+  // Uses spatial grid to limit search to nearby cells for efficiency
   const findNearestPoint = (targetX, targetY, searchRadius) => {
     let nearest = null;
     let minDist = Infinity;
     
-    // Search in a small region for efficiency
-    for (const point of points) {
-      if (Math.abs(point.x - targetX) > searchRadius || Math.abs(point.y - targetY) > searchRadius) {
-        continue;
-      }
-      
-      const dist = Math.sqrt(
-        Math.pow(point.x - targetX, 2) + 
-        Math.pow(point.y - targetY, 2)
-      );
-      
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = point;
+    const centerCellX = Math.floor((targetX - minX) / cellSize);
+    const centerCellY = Math.floor((targetY - minY) / cellSize);
+    const cellRadius = Math.ceil(searchRadius / cellSize);
+    
+    // Build temporary spatial grid for point lookup if not exists
+    if (!pointsGrid) {
+      pointsGrid = new Array(gridWidth * gridHeight).fill(null).map(() => []);
+      points.forEach(point => {
+        const cellX = Math.floor((point.x - minX) / cellSize);
+        const cellY = Math.floor((point.y - minY) / cellSize);
+        if (cellX >= 0 && cellX < gridWidth && cellY >= 0 && cellY < gridHeight) {
+          pointsGrid[cellY * gridWidth + cellX].push(point);
+        }
+      });
+    }
+    
+    // Search only nearby cells within searchRadius
+    for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+      for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+        const cellX = centerCellX + dx;
+        const cellY = centerCellY + dy;
+        
+        if (cellX < 0 || cellX >= gridWidth || cellY < 0 || cellY >= gridHeight) continue;
+        
+        const cellIndex = cellY * gridWidth + cellX;
+        const cellPoints = pointsGrid[cellIndex];
+        
+        for (const point of cellPoints) {
+          const dist = Math.sqrt(
+            Math.pow(point.x - targetX, 2) + 
+            Math.pow(point.y - targetY, 2)
+          );
+          
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = point;
+          }
+        }
       }
     }
     
     return nearest;
   };
+  
+  // Initialize points grid for efficient nearest point lookup
+  let pointsGrid = null;
   
   // Step 5: Bridson's algorithm - generate points around active points
   while (activeList.length > 0 && sampledPoints.length < targetCount) {
