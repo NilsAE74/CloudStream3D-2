@@ -21,8 +21,8 @@ function createWindow() {
 
   // In development, load from React dev server
   // In production, load from built files
-  const isDev = process.env.ELECTRON_START_URL !== undefined;
-  const startURL = isDev 
+  const isDev = !app.isPackaged;
+  const startURL = isDev && process.env.ELECTRON_START_URL
     ? process.env.ELECTRON_START_URL 
     : `file://${path.resolve(__dirname, '../client/build/index.html')}`;
   
@@ -103,10 +103,8 @@ function startServer() {
 app.on('ready', async () => {
   try {
     // In development mode, server is already running via concurrently
-    // Only start server in production (when packaged)
-    const isDev = process.env.ELECTRON_START_URL !== undefined;
-    
-    if (!isDev) {
+    // Only start embedded server in production (when app is packaged)
+    if (app.isPackaged) {
       startServer();
     }
     
