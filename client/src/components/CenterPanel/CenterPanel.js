@@ -29,7 +29,7 @@ const PointCloud = React.memo(function PointCloud({ points, colorMode, statistic
       return { geometry: null, material: null };
     }
 
-    console.log(`[PointCloud] Creating geometry for ${points.length. toLocaleString()} points`);
+    console.log(`[PointCloud] Creating geometry for ${points.length.toLocaleString()} points`);
     const startTime = performance.now();
 
     try {
@@ -47,7 +47,7 @@ const PointCloud = React.memo(function PointCloud({ points, colorMode, statistic
     const highCutoffIndex = Math.ceil(zValues.length * (1 - colorPercentileHigh / 100));
     
     const zMin = zValues[lowCutoffIndex] || zValues[0];
-    const zMax = zValues[Math.min(highCutoffIndex, zValues.length - 1)] || zValues[zValues. length - 1];
+    const zMax = zValues[Math.min(highCutoffIndex, zValues.length - 1)] || zValues[zValues.length - 1];
     const zRange = zMax - zMin || 1;
 
       // Parse custom color if provided
@@ -95,7 +95,7 @@ const PointCloud = React.memo(function PointCloud({ points, colorMode, statistic
 
       // Set attributes on geometry
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE. BufferAttribute(colors, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
       
       console.log(`[PointCloud] Computing bounding sphere... `);
       geometry.computeBoundingSphere();
@@ -113,7 +113,7 @@ const PointCloud = React.memo(function PointCloud({ points, colorMode, statistic
       console.log(`[PointCloud] ✓ Geometry created successfully! `);
       console.log(`[PointCloud]   - Points: ${points.length.toLocaleString()}`);
       console.log(`[PointCloud]   - Time: ${duration}ms`);
-      console.log(`[PointCloud]   - Buffer sizes: positions=${positions.length. toLocaleString()}, colors=${colors.length.toLocaleString()}`);
+      console.log(`[PointCloud]   - Buffer sizes: positions=${positions.length.toLocaleString()}, colors=${colors.length.toLocaleString()}`);
       console.log(`[PointCloud]   - Memory estimate: ~${((positions.length * 4 + colors.length * 4) / 1024 / 1024).toFixed(2)} MB`);
       
       // Warn if this is a large point cloud
@@ -164,9 +164,9 @@ function MeasurementLine({ points }) {
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array([
       points[0].x, points[0].y, points[0].z,
-      points[1].x, points[1]. y, points[1].z
+      points[1].x, points[1].y, points[1].z
     ]);
-    geometry.setAttribute('position', new THREE. BufferAttribute(positions, 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     return geometry;
   }, [points]);
 
@@ -240,7 +240,7 @@ function FilterBox({ filterRanges, statistics, filteringActive }) {
   
   const width = filterRanges.xMax - filterRanges.xMin;
   const height = filterRanges.yMax - filterRanges.yMin;
-  const depth = filterRanges. zMax - filterRanges. zMin;
+  const depth = filterRanges.zMax - filterRanges.zMin;
   
   const centerX = (filterRanges.xMax + filterRanges.xMin) / 2;
   const centerY = (filterRanges.yMax + filterRanges.yMin) / 2;
@@ -290,9 +290,9 @@ function CenterPanel({
   React.useEffect(() => {
     console.log('\n=== CenterPanel Render Update ===');
     if (visibleFiles && visibleFiles.length > 0) {
-      console.log(`Visible files: ${visibleFiles. length}`);
+      console.log(`Visible files: ${visibleFiles.length}`);
       visibleFiles.forEach((file, idx) => {
-        console.log(`  [${idx}] ${file.name}:  ${file.data.points.length. toLocaleString()} points`);
+        console.log(`  [${idx}] ${file.name}:  ${file.data.points.length.toLocaleString()} points`);
       });
       const totalPoints = visibleFiles.reduce((sum, f) => sum + f.data.points.length, 0);
       console.log(`Total points across all files: ${totalPoints.toLocaleString()}`);
@@ -318,8 +318,8 @@ function CenterPanel({
     
     visibleFiles.forEach(file => {
       const stats = file.data.statistics;
-      minX = Math. min(minX, stats.minX);
-      maxX = Math.max(maxX, stats. maxX);
+      minX = Math.min(minX, stats.minX);
+      maxX = Math.max(maxX, stats.maxX);
       minY = Math.min(minY, stats.minY);
       maxY = Math.max(maxY, stats.maxY);
       minZ = Math.min(minZ, stats.minZ);
@@ -337,7 +337,7 @@ function CenterPanel({
 
     const rangeX = stats.maxX - stats.minX;
     const rangeY = stats.maxY - stats.minY;
-    const rangeZ = stats.maxZ - stats. minZ;
+    const rangeZ = stats.maxZ - stats.minZ;
     const maxRange = Math.max(rangeX, rangeY, rangeZ);
 
     // Calculate center of the point cloud
@@ -363,7 +363,7 @@ function CenterPanel({
 
     return [
       (stats.maxX + stats.minX) / 2,
-      (stats.maxY + stats. minY) / 2,
+      (stats.maxY + stats.minY) / 2,
       (stats.maxZ + stats.minZ) / 2
     ];
   }, [combinedStatistics, statistics]);
@@ -420,7 +420,7 @@ function CenterPanel({
                   display="block"
                   sx={{ color: fileColors[index % fileColors.length] }}
                 >
-                  • {file.name}: {file. points.toLocaleString()} pts
+                  • {file.name}: {file.points.toLocaleString()} pts
                 </Typography>
               ))}
               <Typography variant="caption" display="block" sx={{ mt: 1 }}>
@@ -430,19 +430,19 @@ function CenterPanel({
                 Range Y: {combinedStatistics.minY.toFixed(2)} to {combinedStatistics.maxY.toFixed(2)}
               </Typography>
               <Typography variant="caption" display="block">
-                Range Z:  {combinedStatistics.minZ.toFixed(2)} to {combinedStatistics.maxZ. toFixed(2)}
+                Range Z:  {combinedStatistics.minZ.toFixed(2)} to {combinedStatistics.maxZ.toFixed(2)}
               </Typography>
             </>
           ) : (
             <>
               <Typography variant="caption" display="block">
-                Points: {points?. length. toLocaleString() || 0}
+                Points: {points?.length.toLocaleString() || 0}
               </Typography>
               <Typography variant="caption" display="block">
-                Range X: {statistics. minX.toFixed(2)} to {statistics.maxX.toFixed(2)}
+                Range X: {statistics.minX.toFixed(2)} to {statistics.maxX.toFixed(2)}
               </Typography>
               <Typography variant="caption" display="block">
-                Range Y: {statistics.minY. toFixed(2)} to {statistics.maxY.toFixed(2)}
+                Range Y: {statistics.minY.toFixed(2)} to {statistics.maxY.toFixed(2)}
               </Typography>
               <Typography variant="caption" display="block">
                 Range Z: {statistics.minZ.toFixed(2)} to {statistics.maxZ.toFixed(2)}
@@ -501,7 +501,7 @@ function CenterPanel({
           visibleFiles.map((file, index) => (
             <PointCloud
               key={file.id}
-              points={file.data. points}
+              points={file.data.points}
               colorMode={visibleFiles.length > 1 ? 'uniform' : colorMode}
               statistics={file.data.statistics}
               color={visibleFiles.length > 1 ? fileColors[index % fileColors.length] : null}
@@ -559,7 +559,7 @@ function CenterPanel({
               ? 'Click on a point in the cloud to start measurement'
               : selectedPoints.length === 1
               ? 'Click on a second point to measure distance'
-              : 'Measurement complete. Click measure button again to exit. '}
+              : 'Measurement complete. Click measure button again to exit.'}
           </Typography>
         </Paper>
       )}
