@@ -49,12 +49,12 @@ ChartJS.register(
 
 // Use environment variable or construct from window location in Codespaces
 const getApiUrl = () => {
-  if (process.env. REACT_APP_API_URL) {
-    return process.env. REACT_APP_API_URL;
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
   }
   // Check if running in Codespaces
   const hostname = window.location.hostname;
-  if (hostname. includes('app. github.dev')) {
+  if (hostname. includes('app.github.dev')) {
     // Replace port 3000 with 5000 in the hostname
     return `https://${hostname.replace('-3000', '-5000')}`;
   }
