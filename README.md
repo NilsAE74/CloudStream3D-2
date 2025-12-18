@@ -1,6 +1,8 @@
 # CloudStream3D-2
 
-A modern web application for visualizing and processing XYZ point cloud data. Upload files, view interactive 3D visualizations, filter and analyze data with measurements and histograms. Offers transformations (invert Z, shift, rotation) and export of filtered datasets.
+A modern web and desktop application for visualizing and processing XYZ point cloud data. Upload files, view interactive 3D visualizations, filter and analyze data with measurements and histograms. Offers transformations (invert Z, shift, rotation) and export of filtered datasets.
+
+**Now available as both a web application and a desktop application powered by Electron!**
 
 ## Features
 
@@ -42,6 +44,10 @@ A modern web application for visualizing and processing XYZ point cloud data. Up
 - **PapaParse** - CSV parsing
 - **CORS** - Cross-origin resource sharing
 
+### Desktop Application
+- **Electron** - Cross-platform desktop application framework
+- **Electron Builder** - Application packaging and distribution
+
 ## Installation
 
 ### Prerequisites
@@ -76,7 +82,9 @@ REACT_APP_API_URL=http://localhost:5000
 
 ## Running the Application
 
-### Development Mode
+### Web Application
+
+#### Development Mode
 
 **Option 1: Run both frontend and backend simultaneously**:
 ```bash
@@ -99,7 +107,46 @@ The application will be available at:
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:5000
 
-### Production Build
+### Desktop Application
+
+#### Development Mode
+
+Run the desktop application with live reload:
+```bash
+npm run electron:dev
+```
+
+This will:
+1. Start the Express backend server
+2. Start the React development server
+3. Launch the Electron desktop application
+
+The desktop app will automatically connect to the backend server.
+
+#### Production Build (Desktop)
+
+Build standalone desktop applications for your platform:
+
+**All platforms** (based on your current OS):
+```bash
+npm run electron:build
+```
+
+**Platform-specific builds**:
+```bash
+# Windows installer
+npm run electron:build:win
+
+# macOS DMG
+npm run electron:build:mac
+
+# Linux AppImage and DEB
+npm run electron:build:linux
+```
+
+The built applications will be available in the `dist/` folder.
+
+### Production Build (Web)
 
 1. **Build the frontend**:
 ```bash
