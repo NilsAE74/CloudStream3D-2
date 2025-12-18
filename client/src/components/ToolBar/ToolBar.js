@@ -14,7 +14,7 @@ import {
   Layers,
   GridOn,
   GridOff,
-  ThreeDRotation
+  LineAxis
 } from '@mui/icons-material';
 
 function ToolBar({ 
@@ -85,7 +85,7 @@ function ToolBar({
           onClick={toggleAxis}
           color={showAxis ? "primary" : "default"}
         >
-          <ThreeDRotation />
+          <LineAxis />
         </IconButton>
       </Tooltip>
 
