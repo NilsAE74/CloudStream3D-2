@@ -22,9 +22,12 @@ function createWindow() {
   // In development, load from React dev server
   // In production, load from built files
   const isDev = !app.isPackaged;
-  const startURL = isDev && process.env.ELECTRON_START_URL
-    ? process.env.ELECTRON_START_URL 
-    : `file://${path.resolve(__dirname, '../client/build/index.html')}`;
+  let startURL;
+  if (isDev && process.env.ELECTRON_START_URL) {
+    startURL = process.env.ELECTRON_START_URL;
+  } else {
+    startURL = `file://${path.resolve(__dirname, '../client/build/index.html')}`;
+  }
   
   mainWindow.loadURL(startURL);
 
