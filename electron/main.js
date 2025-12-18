@@ -1,6 +1,8 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const fs = require('fs');
+const http = require('http');
 
 let mainWindow;
 let serverProcess;
@@ -19,12 +21,15 @@ function createWindow() {
 
   // In development, load from React dev server
   // In production, load from built files
-  const startURL = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, '../client/build/index.html')}`;
+  const isDev = process.env.ELECTRON_START_URL !== undefined;
+  const startURL = isDev 
+    ? process.env.ELECTRON_START_URL 
+    : `file://${path.resolve(__dirname, '../client/build/index.html')}`;
   
   mainWindow.loadURL(startURL);
 
   // Open DevTools in development mode
-  if (process.env.ELECTRON_START_URL) {
+  if (isDev) {
     mainWindow.webContents.openDevTools();
   }
 
@@ -33,9 +38,51 @@ function createWindow() {
   });
 }
 
+function waitForServer(maxAttempts = 30, interval = 500) {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    
+    const checkServer = () => {
+      attempts++;
+      
+      const req = http.get('http://localhost:5000/api/health', (res) => {
+        if (res.statusCode === 200) {
+          console.log('Server is ready!');
+          resolve();
+        } else {
+          retry();
+        }
+      });
+      
+      req.on('error', () => {
+        retry();
+      });
+      
+      req.setTimeout(1000);
+    };
+    
+    const retry = () => {
+      if (attempts >= maxAttempts) {
+        reject(new Error('Server failed to start within timeout'));
+      } else {
+        setTimeout(checkServer, interval);
+      }
+    };
+    
+    checkServer();
+  });
+}
+
 function startServer() {
-  // Start the Express server
+  // Validate server file exists
   const serverPath = path.join(__dirname, '../server/index.js');
+  
+  if (!fs.existsSync(serverPath)) {
+    console.error(`Server file not found at: ${serverPath}`);
+    throw new Error('Server file not found');
+  }
+  
+  // Start the Express server
   serverProcess = spawn('node', [serverPath], {
     env: { ...process.env, ELECTRON_MODE: 'true' }
   });
@@ -53,10 +100,16 @@ function startServer() {
   });
 }
 
-app.on('ready', () => {
-  startServer();
-  // Give the server a moment to start
-  setTimeout(createWindow, 2000);
+app.on('ready', async () => {
+  try {
+    startServer();
+    // Wait for server to be ready before creating window
+    await waitForServer();
+    createWindow();
+  } catch (error) {
+    console.error('Failed to start application:', error);
+    app.quit();
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -72,8 +125,17 @@ app.on('activate', () => {
 });
 
 app.on('quit', () => {
-  // Clean up server process
+  // Clean up server process gracefully
   if (serverProcess) {
-    serverProcess.kill();
+    // Try graceful shutdown first
+    serverProcess.kill('SIGTERM');
+    
+    // Force kill after timeout if still running
+    setTimeout(() => {
+      if (serverProcess && !serverProcess.killed) {
+        console.log('Forcing server shutdown...');
+        serverProcess.kill('SIGKILL');
+      }
+    }, 5000);
   }
 });
