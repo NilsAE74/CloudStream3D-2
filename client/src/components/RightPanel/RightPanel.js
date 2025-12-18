@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+/import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -54,7 +54,7 @@ const getApiUrl = () => {
   }
   // Check if running in Codespaces
   const hostname = window.location.hostname;
-  if (hostname. includes('app.github.dev')) {
+  if (hostname.includes('app.github.dev')) {
     // Replace port 3000 with 5000 in the hostname
     return `https://${hostname.replace('-3000', '-5000')}`;
   }
@@ -164,7 +164,7 @@ function RightPanel({
     if (visibleFiles && visibleFiles.length > 0) {
       return visibleFiles.reduce((sum, file) => sum + (file.points || 0), 0);
     }
-    return statistics?. count || 0;
+    return statistics?.count || 0;
   }, [visibleFiles, statistics]);
   
   // Calculate dynamic slider parameters based on total points
@@ -192,7 +192,7 @@ function RightPanel({
     marks.push({ value: min, label: `${(min / 1000).toFixed(0)}k` });
     
     if (totalPoints >= 1000000) {
-      const midPoints = [0. 25, 0.5, 0.75]. map(ratio => Math.floor(totalPoints * ratio));
+      const midPoints = [0.25, 0.5, 0.75].map(ratio => Math.floor(totalPoints * ratio));
       midPoints.forEach(val => {
         marks.push({ 
           value: val, 
