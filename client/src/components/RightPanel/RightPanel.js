@@ -425,7 +425,7 @@ function RightPanel({
                 value={pointSize}
                 onChange={(e, value) => setPointSize(value)}
                 min={0.01}
-                max={1. 0}
+                max={1.0}
                 step={0.01}
                 valueLabelDisplay="auto"
                 marks={[
