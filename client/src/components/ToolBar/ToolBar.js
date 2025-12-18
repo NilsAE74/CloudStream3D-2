@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Paper,
   ToggleButton,
-  ToggleButtonGroup,
+  //ToggleButtonGroup,
   IconButton,
   Tooltip,
   Divider
@@ -28,6 +28,10 @@ function ToolBar({
   showAxis,
   toggleAxis
 }) {
+  const toggleColorMode = () => {
+    setColorMode(colorMode === 'height' ? 'uniform' : 'height');
+  };
+  
   return (
     <Paper
       sx={{
@@ -53,25 +57,14 @@ function ToolBar({
 
       <Divider orientation="vertical" flexItem />
 
-      {/* Color Mode */}
-      <Tooltip title="Color Mode">
-        <ToggleButtonGroup
-          value={colorMode}
-          exclusive
-          onChange={(e, newMode) => {
-            if (newMode !== null) {
-              setColorMode(newMode);
-            }
-          }}
-          size="small"
+     {/* Color Mode Toggle */}
+      <Tooltip title={colorMode === 'height' ?  "Height Colors" : "Uniform Color"}>
+        <IconButton 
+          onClick={toggleColorMode}
+          color={colorMode === 'height' ? "primary" : "default"}
         >
-          <ToggleButton value="height" aria-label="height coloring">
-            <Palette fontSize="small" />
-          </ToggleButton>
-          <ToggleButton value="uniform" aria-label="uniform coloring">
-            <Layers fontSize="small" />
-          </ToggleButton>
-        </ToggleButtonGroup>
+          <Palette fontSize="small" />
+        </IconButton>
       </Tooltip>
 
       <Divider orientation="vertical" flexItem />
