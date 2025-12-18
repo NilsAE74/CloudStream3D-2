@@ -89,6 +89,17 @@ function RightPanel({
   onFilteringActiveChange,
   onLocalRangesChange
 }) {
+  // Accordion expanded state
+  const [expandedPanels, setExpandedPanels] = useState({
+    display: false,
+    statistics: false,
+    measurement: false,
+    histogram: false,
+    filtering: false,
+    transformation: false,
+    export: false
+  });
+
   // Transformation state
   const [invertZ, setInvertZ] = useState(false);
   const [shiftX, setShiftX] = useState(0);
@@ -106,6 +117,28 @@ function RightPanel({
   // Debounced slider state
   const [sliderValue, setSliderValue] = useState(maxDisplayPoints);
   const debounceTimerRef = useRef(null);
+
+  // Track previous statistics to detect file changes
+  const prevStatisticsRef = useRef(null);
+
+  // Close all accordions when a new file is loaded (statistics change)
+  useEffect(() => {
+    if (statistics && prevStatisticsRef.current !== statistics) {
+      // Check if it's actually a new file (not just the initial load or same stats)
+      if (prevStatisticsRef.current !== null) {
+        setExpandedPanels({
+          display: false,
+          statistics:  false,
+          measurement: false,
+          histogram: false,
+          filtering: false,
+          transformation:  false,
+          export: false
+        });
+      }
+      prevStatisticsRef.current = statistics;
+    }
+  }, [statistics]);
 
   // Update local ranges when filterRanges prop changes
   React.useEffect(() => {
@@ -138,14 +171,14 @@ function RightPanel({
   const sliderConfig = useMemo(() => {
     if (totalPoints === 0) {
       return {
-        min: 10000,
+        min:  10000,
         max: 5000000,
         step: 100000,
         marks: [
           { value: 100000, label: '100k' },
           { value: 1000000, label: '1M' },
           { value: 2500000, label: '2.5M' },
-          { value: 5000000, label: '5M' }
+          { value:  5000000, label: '5M' }
         ]
       };
     }
@@ -237,7 +270,7 @@ function RightPanel({
     for (let i = 0; i < binCount; i++) {
       const binStart = minZ + i * binSize;
       const binEnd = binStart + binSize;
-      labels.push(binStart.toFixed(2));
+      labels.push(binStart. toFixed(2));
       
       allZValues.forEach(z => {
         if (z >= binStart && z < binEnd) {
@@ -283,7 +316,7 @@ function RightPanel({
       const operations = {
         invertZ: invertZ,
         shift: { dx: shiftX, dy: shiftY, dz: shiftZ },
-        rotate: { rx: rotateX, ry: rotateY, rz: rotateZ }
+        rotate: { rx: rotateX, ry:  rotateY, rz: rotateZ }
       };
 
       const response = await axios.post(`${API_URL}/api/transform`, {
@@ -324,10 +357,10 @@ function RightPanel({
       });
 
       // Create download link
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
+      const url = window. URL.createObjectURL(new Blob([response.data]));
+      const link = document. createElement('a');
       link.href = url;
-      link.setAttribute('download', `pointcloud_${Date.now()}.${format}`);
+      link. setAttribute('download', `pointcloud_${Date.now()}.${format}`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
@@ -350,6 +383,22 @@ function RightPanel({
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }, [selectedPoints]);
 
+  // Handle accordion expand/collapse
+  const handleAccordionChange = (panel) => (event, isExpanded) => {
+    setExpandedPanels(prev => ({
+      ...prev,
+      [panel]: isExpanded
+    }));
+    
+    // Special handling for filtering panel
+    if (panel === 'filtering') {
+      setFilteringActive(isExpanded);
+      if (onFilteringActiveChange) {
+        onFilteringActiveChange(isExpanded);
+      }
+    }
+  };
+
   return (
     <Box sx={{ height: '100%', overflow: 'auto', p: 2 }}>
       <Typography variant="h6" gutterBottom>
@@ -357,7 +406,10 @@ function RightPanel({
       </Typography>
 
       {/* Display Controls */}
-      <Accordion defaultExpanded>
+      <Accordion 
+        expanded={expandedPanels.display}
+        onChange={handleAccordionChange('display')}
+      >
         <AccordionSummary expandIcon={<ExpandMore />}>
           <FilterAlt sx={{ mr: 1 }} />
           <Typography>Display Settings</Typography>
@@ -377,7 +429,7 @@ function RightPanel({
                 step={0.01}
                 valueLabelDisplay="auto"
                 marks={[
-                  { value: 0.01, label: '0.01' },
+                  { value:  0.01, label: '0.01' },
                   { value: 0.1, label: '0.1' },
                   { value: 0.5, label: '0.5' },
                   { value: 1.0, label: '1.0' }
@@ -386,7 +438,7 @@ function RightPanel({
             </Box>
 
             {/* Downsampling Controls - Only show when files are loaded */}
-            {(visibleFiles?.length > 0 || statistics?.count > 0) && (
+            {(visibleFiles?. length > 0 || statistics?. count > 0) && (
               <>
                 {/* Downsampling Toggle */}
                 <Box sx={{ mb: 2 }}>
@@ -441,7 +493,7 @@ function RightPanel({
                     disabled={!downsamplingEnabled}
                   />
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                    Higher values may affect performance. Changes apply to newly loaded files.
+                    Higher values may affect performance.  Changes apply to newly loaded files.
                   </Typography>
                 </Box>
               </>
@@ -468,7 +520,7 @@ function RightPanel({
                   step={0.1}
                   valueLabelDisplay="auto"
                   marks={[
-                    { value: 0.1, label: '0.1' },
+                    { value:  0.1, label: '0.1' },
                     { value: 1.0, label: '1.0' },
                     { value: 2.0, label: '2.0' },
                     { value: 3.0, label: '3.0' }
@@ -530,16 +582,19 @@ function RightPanel({
       </Accordion>
 
       {/* Statistics Section */}
-      <Accordion defaultExpanded>
+      <Accordion 
+        expanded={expandedPanels.statistics}
+        onChange={handleAccordionChange('statistics')}
+      >
         <AccordionSummary expandIcon={<ExpandMore />}>
           <Assessment sx={{ mr: 1 }} />
           <Typography>Statistics</Typography>
         </AccordionSummary>
         <AccordionDetails>
-          {statistics ? (
+          {statistics ?  (
             <Box>
               <Typography variant="body2" gutterBottom>
-                <strong>Point Count:</strong> {statistics.count.toLocaleString()}
+                <strong>Point Count:</strong> {statistics.count. toLocaleString()}
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Typography variant="body2">
@@ -549,7 +604,7 @@ function RightPanel({
                 <strong>Y Range:</strong> {statistics.minY.toFixed(3)} to {statistics.maxY.toFixed(3)}
               </Typography>
               <Typography variant="body2">
-                <strong>Z Range:</strong> {statistics.minZ.toFixed(3)} to {statistics.maxZ.toFixed(3)}
+                <strong>Z Range:</strong> {statistics.minZ.toFixed(3)} to {statistics.maxZ. toFixed(3)}
               </Typography>
             </Box>
           ) : (
@@ -562,7 +617,10 @@ function RightPanel({
 
       {/* Measurement Section */}
       {selectedPoints && selectedPoints.length > 0 && (
-        <Accordion defaultExpanded>
+        <Accordion 
+          expanded={expandedPanels.measurement}
+          onChange={handleAccordionChange('measurement')}
+        >
           <AccordionSummary expandIcon={<ExpandMore />}>
             <Straighten sx={{ mr: 1 }} />
             <Typography>Measurement</Typography>
@@ -570,7 +628,7 @@ function RightPanel({
           <AccordionDetails>
             <Box>
               <Typography variant="body2" gutterBottom>
-                Selected Points: {selectedPoints.length}
+                Selected Points:  {selectedPoints.length}
               </Typography>
               {selectedPoints.map((point, index) => (
                 <Typography key={index} variant="caption" display="block">
@@ -578,7 +636,7 @@ function RightPanel({
                 </Typography>
               ))}
               {measurementDistance !== null && (
-                <Alert severity="info" sx={{ mt: 1 }}>
+                <Alert severity="info" sx={{ mt:  1 }}>
                   <Typography variant="body2">
                     <strong>Distance:</strong> {measurementDistance.toFixed(3)} units
                   </Typography>
@@ -591,7 +649,10 @@ function RightPanel({
 
       {/* Histogram Section */}
       {histogramData && (
-        <Accordion>
+        <Accordion 
+          expanded={expandedPanels. histogram}
+          onChange={handleAccordionChange('histogram')}
+        >
           <AccordionSummary expandIcon={<ExpandMore />}>
             <Assessment sx={{ mr: 1 }} />
             <Typography>Z-value Histogram</Typography>
@@ -621,7 +682,7 @@ function RightPanel({
                   x: {
                     title: {
                       display: true,
-                      text: 'Z Value'
+                      text:  'Z Value'
                     }
                   }
                 }
@@ -634,23 +695,18 @@ function RightPanel({
       {/* Filtering Section */}
       {statistics && (
         <Accordion 
-          expanded={filteringActive}
-          onChange={(e, expanded) => {
-            setFilteringActive(expanded);
-            if (onFilteringActiveChange) {
-              onFilteringActiveChange(expanded);
-            }
-          }}
+          expanded={expandedPanels.filtering}
+          onChange={handleAccordionChange('filtering')}
         >
           <AccordionSummary expandIcon={<ExpandMore />}>
-            <FilterAlt sx={{ mr: 1 }} />
+            <FilterAlt sx={{ mr:  1 }} />
             <Typography>Data Filtering</Typography>
           </AccordionSummary>
           <AccordionDetails>
             <Box>
               {/* X Range */}
               <Typography variant="body2" gutterBottom>
-                X Range: {localRanges.xMin?.toFixed(2)} - {localRanges.xMax?.toFixed(2)}
+                X Range: {localRanges.xMin?. toFixed(2)} - {localRanges.xMax?.toFixed(2)}
               </Typography>
               <Slider
                 value={[localRanges.xMin || statistics.minX, localRanges.xMax || statistics.maxX]}
@@ -681,7 +737,7 @@ function RightPanel({
                     yMax: newValue[1]
                   }));
                 }}
-                min={statistics.minY}
+                min={statistics. minY}
                 max={statistics.maxY}
                 step={(statistics.maxY - statistics.minY) / 100}
                 valueLabelDisplay="auto"
@@ -722,7 +778,10 @@ function RightPanel({
 
       {/* Transformation Section */}
       {allPoints && allPoints.length > 0 && (
-        <Accordion>
+        <Accordion 
+          expanded={expandedPanels.transformation}
+          onChange={handleAccordionChange('transformation')}
+        >
           <AccordionSummary expandIcon={<ExpandMore />}>
             <Transform sx={{ mr: 1 }} />
             <Typography>Transformations</Typography>
@@ -823,13 +882,16 @@ function RightPanel({
 
       {/* Export Section */}
       {points && points.length > 0 && (
-        <Accordion>
+        <Accordion 
+          expanded={expandedPanels.export}
+          onChange={handleAccordionChange('export')}
+        >
           <AccordionSummary expandIcon={<ExpandMore />}>
             <Download sx={{ mr: 1 }} />
             <Typography>Export Data</Typography>
           </AccordionSummary>
           <AccordionDetails>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap:  1 }}>
               <Button
                 variant="outlined"
                 startIcon={<Download />}
@@ -847,7 +909,7 @@ function RightPanel({
                 Export as XYZ
               </Button>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                Exports currently filtered data ({points.length.toLocaleString()} points)
+                Exports currently filtered data ({points.length. toLocaleString()} points)
               </Typography>
             </Box>
           </AccordionDetails>
