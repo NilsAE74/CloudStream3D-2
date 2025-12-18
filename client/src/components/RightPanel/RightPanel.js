@@ -270,7 +270,7 @@ function RightPanel({
     for (let i = 0; i < binCount; i++) {
       const binStart = minZ + i * binSize;
       const binEnd = binStart + binSize;
-      labels.push(binStart. toFixed(2));
+      labels.push(binStart.toFixed(2));
       
       allZValues.forEach(z => {
         if (z >= binStart && z < binEnd) {
@@ -357,10 +357,10 @@ function RightPanel({
       });
 
       // Create download link
-      const url = window. URL.createObjectURL(new Blob([response.data]));
-      const link = document. createElement('a');
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
       link.href = url;
-      link. setAttribute('download', `pointcloud_${Date.now()}.${format}`);
+      link.setAttribute('download', `pointcloud_${Date.now()}.${format}`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
@@ -438,7 +438,7 @@ function RightPanel({
             </Box>
 
             {/* Downsampling Controls - Only show when files are loaded */}
-            {(visibleFiles?. length > 0 || statistics?. count > 0) && (
+            {(visibleFiles?.length > 0 || statistics?.count > 0) && (
               <>
                 {/* Downsampling Toggle */}
                 <Box sx={{ mb: 2 }}>
@@ -594,7 +594,7 @@ function RightPanel({
           {statistics ?  (
             <Box>
               <Typography variant="body2" gutterBottom>
-                <strong>Point Count:</strong> {statistics.count. toLocaleString()}
+                <strong>Point Count:</strong> {statistics.count.toLocaleString()}
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Typography variant="body2">
@@ -604,7 +604,7 @@ function RightPanel({
                 <strong>Y Range:</strong> {statistics.minY.toFixed(3)} to {statistics.maxY.toFixed(3)}
               </Typography>
               <Typography variant="body2">
-                <strong>Z Range:</strong> {statistics.minZ.toFixed(3)} to {statistics.maxZ. toFixed(3)}
+                <strong>Z Range:</strong> {statistics.minZ.toFixed(3)} to {statistics.maxZ.toFixed(3)}
               </Typography>
             </Box>
           ) : (
@@ -650,7 +650,7 @@ function RightPanel({
       {/* Histogram Section */}
       {histogramData && (
         <Accordion 
-          expanded={expandedPanels. histogram}
+          expanded={expandedPanels.histogram}
           onChange={handleAccordionChange('histogram')}
         >
           <AccordionSummary expandIcon={<ExpandMore />}>
@@ -706,7 +706,7 @@ function RightPanel({
             <Box>
               {/* X Range */}
               <Typography variant="body2" gutterBottom>
-                X Range: {localRanges.xMin?. toFixed(2)} - {localRanges.xMax?.toFixed(2)}
+                X Range: {localRanges.xMin?.toFixed(2)} - {localRanges.xMax?.toFixed(2)}
               </Typography>
               <Slider
                 value={[localRanges.xMin || statistics.minX, localRanges.xMax || statistics.maxX]}
@@ -737,7 +737,7 @@ function RightPanel({
                     yMax: newValue[1]
                   }));
                 }}
-                min={statistics. minY}
+                min={statistics.minY}
                 max={statistics.maxY}
                 step={(statistics.maxY - statistics.minY) / 100}
                 valueLabelDisplay="auto"
@@ -909,7 +909,7 @@ function RightPanel({
                 Export as XYZ
               </Button>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                Exports currently filtered data ({points.length. toLocaleString()} points)
+                Exports currently filtered data ({points.length.toLocaleString()} points)
               </Typography>
             </Box>
           </AccordionDetails>
