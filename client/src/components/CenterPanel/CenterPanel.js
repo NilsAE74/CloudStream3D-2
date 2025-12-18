@@ -402,7 +402,7 @@ function CenterPanel({
             position: 'absolute',
             top: 70,
             left: 10,
-            p: 1. 5,
+            p: 1.5,
             bgcolor: 'rgba(30, 41, 59, 0.9)',
             backdropFilter: 'blur(5px)',
             zIndex: 10
