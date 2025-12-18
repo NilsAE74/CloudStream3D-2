@@ -101,14 +101,14 @@ function SineWaveSurface() {
 }
 
 // Reference Sphere Component
-function ReferenceSphere() {
-  return (
-    <mesh position={[0, 0, 3]}>
-      <sphereGeometry args={[0.5, 32, 32]} />
-      <meshStandardMaterial color="#ff9800" emissive="#ff9800" emissiveIntensity={0.5} />
-    </mesh>
-  );
-}
+//function ReferenceSphere() {
+//  return (
+//    <mesh position={[0, 0, 3]}>
+//      <sphereGeometry args={[0.5, 32, 32]} />
+//      <meshStandardMaterial color="#ff9800" emissive="#ff9800" emissiveIntensity={0.5} />
+//    </mesh>
+//  );
+//}
 
 // Main Demo Component
 function SineWaveDemo() {
@@ -261,8 +261,8 @@ function SineWaveDemo() {
         <directionalLight position={[10, 10, 10]} intensity={0.6} />
         <directionalLight position={[-10, -10, 5]} intensity={0.3} />
         
-        {/* Grid */}
-        <gridHelper args={[30, 30, '#444', '#222']} rotation={[0, 0, 0]} />
+        {/* Grid DISABLED */}
+        {/*<gridHelper args={[30, 30, '#444', '#222']} rotation={[0, 0, 0]} />*/}
         
         {/* Coordinate axes */}
         <axesHelper args={[12]} />
@@ -270,8 +270,8 @@ function SineWaveDemo() {
         {/* Animated Sine Wave Surface */}
         <SineWaveSurface />
         
-        {/* Reference Sphere */}
-        <ReferenceSphere />
+        {/* Reference Sphere - DISABLED */}
+        {/* <ReferenceSphere /> */}
       </Canvas>
     </Box>
   );
