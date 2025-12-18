@@ -14,7 +14,7 @@ import {
   Layers,
   GridOn,
   GridOff,
-  Clear
+  ClearIcon
 } from '@mui/icons-material';
 
 function ToolBar({ 
@@ -85,7 +85,7 @@ function ToolBar({
           onClick={toggleAxis}
           color={showAxis ? "primary" : "default"}
         >
-          <LineAxis />
+          <ClearIcon />
         </IconButton>
       </Tooltip>
 
