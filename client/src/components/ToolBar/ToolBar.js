@@ -14,7 +14,7 @@ import {
   Layers,
   GridOn,
   GridOff,
-  Clear
+  LineAxis
 } from '@mui/icons-material';
 
 function ToolBar({ 
@@ -26,7 +26,7 @@ function ToolBar({
   showGrid,
   toggleGrid,
   showAxis,
-  toggleAxis  
+  toggleAxis
 }) {
   const toggleColorMode = () => {
     setColorMode(colorMode === 'height' ? 'uniform' : 'height');
@@ -85,7 +85,7 @@ function ToolBar({
           onClick={toggleAxis}
           color={showAxis ? "primary" : "default"}
         >
-          <Clear />
+          <LineAxis />
         </IconButton>
       </Tooltip>
 
