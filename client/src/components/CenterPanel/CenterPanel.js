@@ -206,9 +206,13 @@ function Grid({ statistics, visible }) {
   const centerY = (statistics.maxY + statistics.minY) / 2;
   const centerZ = statistics.minZ;
 
+  // Sett avstand mellom grid-linjer i meter
+  const gridSpacing = 10; // 10 meter mellom hver linje
+  const divisions = Math.ceil(size / gridSpacing); // Beregn antall divisjoner
+
   return (
     <group position={[centerX, centerY, centerZ]}>
-      <gridHelper args={[size * 1, 20, '#444', '#222']} rotation={[Math.PI / 2, 0, 0]} />
+      <gridHelper args={[divisions * gridSpacing, divisions, '#444', '#222']} rotation={[Math.PI / 2, 0, 0]} />
     </group>
   );
 }
