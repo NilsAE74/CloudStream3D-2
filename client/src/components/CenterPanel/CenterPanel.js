@@ -208,7 +208,7 @@ function Grid({ statistics, visible }) {
 
   return (
     <group position={[centerX, centerY, centerZ]}>
-      <gridHelper args={[size * 1.2, 20, '#444', '#222']} rotation={[Math.PI / 2, 0, 0]} />
+      <gridHelper args={[size * 1, 20, '#444', '#222']} rotation={[Math.PI / 2, 0, 0]} />
     </group>
   );
 }
@@ -229,7 +229,7 @@ function AxisHelper({ statistics, visible }) {
 
   return (
     <group position={[centerX, centerY, centerZ]}>
-      <axesHelper args={[size * 0.6]} />
+      <axesHelper args={[size * 0.1]} />
     </group>
   );
 }
