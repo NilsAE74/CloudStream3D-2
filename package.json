@@ -12,7 +12,7 @@
     "install-all": "npm install && cd client && npm install",
     "electron:dev": "concurrently \"npm run server\" \"npm run client:electron\" \"npm run electron:start\"",
     "client:electron": "cd client && npx cross-env BROWSER=none npm start",
-    "electron:start": "npx wait-on http://localhost:3000 && npx electron .",
+    "electron:start": "npx wait-on http://localhost:3000 && npx cross-env ELECTRON_START_URL=http://localhost:3000 electron .",
     "electron:build": "npm run build && npx electron-builder",
     "electron:build:win": "npm run build && npx electron-builder --win",
     "electron:build:mac": "npm run build && npx electron-builder --mac",

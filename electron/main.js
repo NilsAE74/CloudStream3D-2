@@ -102,7 +102,14 @@ function startServer() {
 
 app.on('ready', async () => {
   try {
-    startServer();
+    // In development mode, server is already running via concurrently
+    // Only start server in production (when packaged)
+    const isDev = process.env.ELECTRON_START_URL !== undefined;
+    
+    if (!isDev) {
+      startServer();
+    }
+    
     // Wait for server to be ready before creating window
     await waitForServer();
     createWindow();
