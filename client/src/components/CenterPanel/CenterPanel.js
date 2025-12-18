@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { Box, Typography, Paper } from '@mui/material';
 import ToolBar from '../ToolBar/ToolBar';
 import * as THREE from 'three';
@@ -542,6 +542,18 @@ function CenterPanel({
             )}
           </>
         )}
+        
+        {/* Axis orientation helper in bottom right corner */}
+        <GizmoHelper
+          alignment="bottom-right"
+          margin={[80, 80]}
+        >
+          <GizmoViewport 
+            axisColors={['#ff0000', '#00ff00', '#0000ff']}
+            labelColor="white"
+            labels={['E', 'N', 'Z']}
+          />
+        </GizmoHelper>
       </Canvas>
 
       {/* Measurement Instructions */}
