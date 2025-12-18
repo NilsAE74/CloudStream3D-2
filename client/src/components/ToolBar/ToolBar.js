@@ -14,7 +14,7 @@ import {
   Layers,
   GridOn,
   GridOff,
-  LineAxis
+  Clear
 } from '@mui/icons-material';
 
 function ToolBar({ 
