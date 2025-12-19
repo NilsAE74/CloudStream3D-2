@@ -12,6 +12,12 @@ A modern web application for visualizing and processing XYZ point cloud data. Up
 
 ### Advanced Features
 - ✅ **Histogram Visualization**: Z-value distribution using Chart.js
+- ✅ **PDF Report Generation**: Comprehensive one-page analysis reports with:
+  - Complete statistics (count, extent, mean, standard deviation)
+  - Z-value histogram
+  - 3D visualization with height-based coloring
+  - Average nearest neighbor distance
+  - Optimized PDF size (< 2 MB)
 - 🔧 **Measurement Tool**: UI placeholder for point selection and distance calculation (requires future implementation)
 - ✅ **Data Export**: Export filtered datasets as CSV or XYZ format
 - ✅ **Data Transformations**:
@@ -38,15 +44,19 @@ A modern web application for visualizing and processing XYZ point cloud data. Up
 
 ### Backend
 - **Node.js** with **Express** - Server framework
+- **Python 3** - PDF report generation and analysis
 - **Multer** - File upload handling
 - **PapaParse** - CSV parsing
 - **CORS** - Cross-origin resource sharing
+- **NumPy, Matplotlib, SciPy, ReportLab** - Python libraries for analysis and PDF generation
 
 ## Installation
 
 ### Prerequisites
 - Node.js (v14 or higher)
 - npm or yarn
+- Python 3.8 or higher
+- pip (Python package manager)
 
 ### Setup Instructions
 
@@ -58,13 +68,16 @@ cd CloudStream3D-2
 
 2. **Install dependencies**:
 ```bash
-# Install root dependencies
+# Install Node.js dependencies
 npm install
 
 # Install client dependencies
 cd client
 npm install
 cd ..
+
+# Install Python dependencies for PDF report generation
+pip3 install -r requirements.txt
 ```
 
 3. **Configure environment** (optional):
@@ -158,7 +171,18 @@ Apply various transformations:
 - **Rotate**: Rotate around X, Y, or Z axes (in degrees)
 - Click "Apply Transformations" to execute
 
-### 6. Export Data
+### 6. Generate PDF Report
+- Click "Generate PDF Report" button in the left panel under any uploaded file
+- The system will generate a comprehensive one-page analysis report including:
+  - Statistical summary (count, extent, mean, standard deviation)
+  - Z-value histogram
+  - 3D visualization with height-based coloring
+  - Average nearest neighbor distance
+- PDF file is automatically named `pointcloud_<filename>.pdf`
+- PDF size optimized to stay under 2 MB
+- Report downloads automatically when ready
+
+### 7. Export Data
 - Export the currently filtered dataset
 - Choose format: CSV or XYZ
 - File downloads automatically
@@ -183,9 +207,11 @@ CloudStream3D-2/
 ├── server/                      # Node.js backend
 │   ├── utils/
 │   │   ├── transformations.js  # Point cloud transformation utilities
-│   │   └── sampling.js         # Advanced downsampling algorithms
+│   │   ├── sampling.js         # Advanced downsampling algorithms
+│   │   └── generate_report.py # Python script for PDF report generation
 │   └── index.js                # Express server and API endpoints
 ├── uploads/                     # Uploaded files (gitignored)
+├── requirements.txt             # Python dependencies
 ├── package.json                 # Root package configuration
 ├── .gitignore
 └── README.md
@@ -216,6 +242,18 @@ Filter points by range
 Export point cloud data
 - **Body**: `{ points: Array, format: String }`
 - **Returns**: File download (CSV or XYZ)
+
+### `POST /api/generate-report`
+Generate comprehensive PDF analysis report
+- **Body**: `{ fileId: String, originalFilename: String }`
+- **Returns**: PDF file download
+- **Features**:
+  - Complete statistical analysis (count, extent, mean, std dev)
+  - Z-value histogram with 20 bins
+  - 3D visualization with height-based coloring
+  - Average nearest neighbor distance calculation
+  - Optimized PDF size (< 2 MB)
+  - One-page English report with professional layout
 
 ## Development
 
