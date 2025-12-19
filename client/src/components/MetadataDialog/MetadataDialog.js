@@ -12,35 +12,36 @@ import {
   Alert
 } from '@mui/material';
 
+// Default template for metadata fields
+// Defined outside component to avoid recreation on each render
+const DEFAULT_METADATA = [
+  '# Project: ',
+  '# Location: ',
+  '# CRS: EPSG:25832 (UTM Zone 32N)',
+  '# Scanner: ',
+  '# Scan Date: ',
+  '# Operator: ',
+  '# Weather: ',
+  '# Accuracy: ',
+  '# Software: ',
+  '# Notes: ',
+  '# Point Format: ',
+  '# Units: '
+];
+
 /**
  * MetadataDialog component
  * Displays a form for users to enter project metadata information
  * The metadata will be saved to a .txt file and included in the PDF report
  */
 function MetadataDialog({ open, onClose, onSave, loading }) {
-  // Default template for metadata fields
-  const defaultMetadata = [
-    '# Project: ',
-    '# Location: ',
-    '# CRS: EPSG:25832 (UTM Zone 32N)',
-    '# Scanner: ',
-    '# Scan Date: ',
-    '# Operator: ',
-    '# Weather: ',
-    '# Accuracy: ',
-    '# Software: ',
-    '# Notes: ',
-    '# Point Format: ',
-    '# Units: '
-  ];
-
-  const [metadataLines, setMetadataLines] = useState(defaultMetadata);
+  const [metadataLines, setMetadataLines] = useState(DEFAULT_METADATA);
   const [error, setError] = useState(null);
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
-      setMetadataLines(defaultMetadata);
+      setMetadataLines(DEFAULT_METADATA);
       setError(null);
     }
   }, [open]);

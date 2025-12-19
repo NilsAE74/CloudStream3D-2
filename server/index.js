@@ -465,6 +465,39 @@ app.post('/api/save-metadata', (req, res) => {
       return res.status(400).json({ error: 'Metadata must be an array of strings' });
     }
     
+    // Validate metadata content
+    // Check that each line is a string and has reasonable length
+    const MAX_LINE_LENGTH = 500;
+    const MAX_LINES = 100;
+    
+    if (metadata.length > MAX_LINES) {
+      return res.status(400).json({ error: `Too many metadata lines (max ${MAX_LINES})` });
+    }
+    
+    for (let i = 0; i < metadata.length; i++) {
+      const line = metadata[i];
+      
+      // Ensure each item is a string
+      if (typeof line !== 'string') {
+        return res.status(400).json({ error: `Metadata line ${i + 1} must be a string` });
+      }
+      
+      // Check line length
+      if (line.length > MAX_LINE_LENGTH) {
+        return res.status(400).json({ 
+          error: `Metadata line ${i + 1} exceeds maximum length of ${MAX_LINE_LENGTH} characters` 
+        });
+      }
+      
+      // Sanitize: Remove any control characters except newline and tab
+      // This prevents potential file system attacks
+      if (/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/.test(line)) {
+        return res.status(400).json({ 
+          error: `Metadata line ${i + 1} contains invalid control characters` 
+        });
+      }
+    }
+    
     // Step 1: Construct path to uploaded file
     const uploadDir = path.join(__dirname, '../uploads');
     const inputFile = path.join(uploadDir, fileId);
