@@ -1,8 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { Box, CssBaseline, ThemeProvider, createTheme, Fab } from '@mui/material';
+import { Waves as WavesIcon, Home as HomeIcon } from '@mui/icons-material';
 import LeftPanel from './components/LeftPanel/LeftPanel';
 import CenterPanel from './components/CenterPanel/CenterPanel';
 import RightPanel from './components/RightPanel/RightPanel';
+import SineWaveDemo from './components/SineWaveDemo/SineWaveDemo';
 import './App.css';
 
 // Create Material-UI theme
@@ -22,7 +25,8 @@ const theme = createTheme({
   },
 });
 
-function App() {
+// Main application component
+function MainApp() {
   // State management
   const [pointCloudData, setPointCloudData] = useState(null);
   const [filteredData, setFilteredData] = useState(null);
@@ -138,8 +142,7 @@ function App() {
   }, []);
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <>
       <Box sx={{ 
         display: 'flex', 
         height: '100vh', 
@@ -217,6 +220,56 @@ function App() {
           />
         </Box>
       </Box>
+      
+      {/* Floating button to navigate to demo */}
+      <Fab
+        component={Link}
+        to="/demo"
+        color="primary"
+        sx={{
+          position: 'fixed',
+          bottom: 20,
+          right: 20,
+          zIndex: 1000
+        }}
+        title="Go to 3D Navigation Demo"
+      >
+        <WavesIcon />
+      </Fab>
+    </>
+  );
+}
+
+// Main App with Router
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <Routes>
+          <Route path="/" element={<MainApp />} />
+          <Route path="/demo" element={
+            <>
+              <SineWaveDemo />
+              {/* Floating button to go back home */}
+              <Fab
+                component={Link}
+                to="/"
+                color="primary"
+                sx={{
+                  position: 'fixed',
+                  bottom: 20,
+                  right: 20,
+                  zIndex: 1000
+                }}
+                title="Go back to main app"
+              >
+                <HomeIcon />
+              </Fab>
+            </>
+          } />
+        </Routes>
+      </Router>
     </ThemeProvider>
   );
 }
