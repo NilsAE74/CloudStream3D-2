@@ -372,6 +372,166 @@ app.post('/api/export', (req, res) => {
   }
 });
 
+/**
+ * API Endpoint: Check if metadata file exists for a given file
+ * 
+ * This endpoint checks if a .txt metadata file exists in the same folder
+ * as the uploaded .xyz file with the same name.
+ * 
+ * Request body:
+ *   - fileId: The ID of the uploaded file (filename in uploads directory)
+ * 
+ * Response:
+ *   - exists: Boolean indicating if metadata file exists
+ *   - metadataFilePath: Full path to the metadata file
+ *   - metadata: Array of metadata lines if file exists, null otherwise
+ */
+app.post('/api/check-metadata', (req, res) => {
+  try {
+    const { fileId } = req.body;
+    
+    // Validate request
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    // Step 1: Construct path to uploaded file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Step 2: Verify that the original file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Step 3: Determine metadata file path
+    // Get base filename without extension and append .txt
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
+    
+    // Step 4: Check if metadata file exists
+    const metadataExists = fs.existsSync(metadataFilePath);
+    
+    // Step 5: If metadata exists, read and return its content
+    let metadata = null;
+    if (metadataExists) {
+      try {
+        const content = fs.readFileSync(metadataFilePath, 'utf-8');
+        metadata = content.split('\n').filter(line => line.trim() !== '');
+      } catch (error) {
+        console.error('Error reading metadata:', error);
+      }
+    }
+    
+    // Step 6: Return response
+    res.json({
+      exists: metadataExists,
+      metadataFilePath: metadataFilePath,
+      metadata: metadata
+    });
+    
+  } catch (error) {
+    console.error('Check metadata error:', error);
+    res.status(500).json({ error: error.message || 'Error checking metadata' });
+  }
+});
+
+/**
+ * API Endpoint: Save metadata to a .txt file
+ * 
+ * This endpoint creates a new .txt file with the same name as the uploaded
+ * .xyz file and saves the provided metadata lines to it. The metadata will
+ * then be included in future PDF reports.
+ * 
+ * Request body:
+ *   - fileId: The ID of the uploaded file (filename in uploads directory)
+ *   - metadata: Array of metadata lines (strings) to save
+ * 
+ * Response:
+ *   - success: Boolean indicating if save was successful
+ *   - metadataFilePath: Full path to the saved metadata file
+ *   - message: Success message
+ */
+app.post('/api/save-metadata', (req, res) => {
+  try {
+    const { fileId, metadata } = req.body;
+    
+    // Validate request
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    if (!metadata || !Array.isArray(metadata)) {
+      return res.status(400).json({ error: 'Metadata must be an array of strings' });
+    }
+    
+    // Validate metadata content
+    // Check that each line is a string and has reasonable length
+    const MAX_LINE_LENGTH = 500;
+    const MAX_LINES = 100;
+    
+    if (metadata.length > MAX_LINES) {
+      return res.status(400).json({ error: `Too many metadata lines (max ${MAX_LINES})` });
+    }
+    
+    for (let i = 0; i < metadata.length; i++) {
+      const line = metadata[i];
+      
+      // Ensure each item is a string
+      if (typeof line !== 'string') {
+        return res.status(400).json({ error: `Metadata line ${i + 1} must be a string` });
+      }
+      
+      // Check line length
+      if (line.length > MAX_LINE_LENGTH) {
+        return res.status(400).json({ 
+          error: `Metadata line ${i + 1} exceeds maximum length of ${MAX_LINE_LENGTH} characters` 
+        });
+      }
+      
+      // Sanitize: Remove any control characters except newline and tab
+      // This prevents potential file system attacks
+      if (/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/.test(line)) {
+        return res.status(400).json({ 
+          error: `Metadata line ${i + 1} contains invalid control characters` 
+        });
+      }
+    }
+    
+    // Step 1: Construct path to uploaded file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Step 2: Verify that the original file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Step 3: Determine metadata file path
+    // Get base filename without extension and append .txt
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
+    
+    // Step 4: Write metadata to file
+    // Join all metadata lines with newline characters
+    const content = metadata.join('\n');
+    fs.writeFileSync(metadataFilePath, content, 'utf-8');
+    
+    console.log(`[Metadata] Saved metadata to: ${metadataFilePath}`);
+    
+    // Step 5: Return success response
+    res.json({
+      success: true,
+      metadataFilePath: metadataFilePath,
+      message: 'Metadata saved successfully'
+    });
+    
+  } catch (error) {
+    console.error('Save metadata error:', error);
+    res.status(500).json({ error: error.message || 'Error saving metadata' });
+  }
+});
+
 // Generate PDF report
 app.post('/api/generate-report', async (req, res) => {
   try {
