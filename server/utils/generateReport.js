@@ -704,9 +704,11 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
  * @param {string} inputFile - Path to input XYZ file
  * @param {string} outputFile - Path to output PDF file
  * @param {string} originalFilename - Original filename for display in report
+ * @param {string} projectName - Optional project name to include in report
+ * @param {Object} metadataObj - Optional pre-loaded metadata object
  * @returns {Promise<Object>} Result object with success status
  */
-async function generateReport(inputFile, outputFile, originalFilename = null) {
+async function generateReport(inputFile, outputFile, originalFilename = null, projectName = null, metadataObj = null) {
   console.log('\n' + '='.repeat(60));
   console.log('POINT CLOUD ANALYSIS AND REPORT GENERATION (JavaScript)');
   console.log('='.repeat(60));
@@ -728,25 +730,37 @@ async function generateReport(inputFile, outputFile, originalFilename = null) {
     // ========================================
     // METADATA FILE HANDLING
     // ========================================
-    // Step 1: Check for metadata file
-    // The metadata file should have the same name as the input file but with .txt extension
-    // For example, if input is "scan-data.xyz", look for "scan-data.txt"
+    let metadata = metadataObj;
     
-    // Get the directory where the input file is located
-    const inputDir = path.dirname(inputFile);
+    // If metadata not provided, try to read from file
+    if (!metadata) {
+      // Step 1: Check for metadata file
+      // The metadata file should have the same name as the input file but with .txt extension
+      // For example, if input is "scan-data.xyz", look for "scan-data.txt"
+      
+      // Get the directory where the input file is located
+      const inputDir = path.dirname(inputFile);
+      
+      // Get the base filename without extension (e.g., "scan-data.xyz" -> "scan-data")
+      const inputBasename = path.basename(inputFile, path.extname(inputFile));
+      
+      // Construct the full path to the metadata file
+      const metadataFilePath = path.join(inputDir, inputBasename + '.txt');
+      
+      console.log(`[Metadata] Checking for metadata file: ${metadataFilePath}`);
+      
+      // Step 2: Read metadata if the file exists
+      // If the file doesn't exist, readMetadata() will return null and the report
+      // will be generated without the Project Information section
+      metadata = readMetadata(metadataFilePath);
+    } else {
+      console.log('[Metadata] Using pre-loaded metadata object');
+    }
     
-    // Get the base filename without extension (e.g., "scan-data.xyz" -> "scan-data")
-    const inputBasename = path.basename(inputFile, path.extname(inputFile));
-    
-    // Construct the full path to the metadata file
-    const metadataFilePath = path.join(inputDir, inputBasename + '.txt');
-    
-    console.log(`[Metadata] Checking for metadata file: ${metadataFilePath}`);
-    
-    // Step 2: Read metadata if the file exists
-    // If the file doesn't exist, readMetadata() will return null and the report
-    // will be generated without the Project Information section
-    const metadata = readMetadata(metadataFilePath);
+    // Add project name to metadata if provided
+    if (projectName && metadata) {
+      metadata.Project = projectName;
+    }
     
     // Step 3: Generate PDF report with or without metadata
     const displayFilename = originalFilename || path.basename(inputFile);

@@ -47,6 +47,8 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
   const [selectedFileForReport, setSelectedFileForReport] = useState(null);
   const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
   const [currentFileForMetadata, setCurrentFileForMetadata] = useState(null);
+  const [latestFileMetadata, setLatestFileMetadata] = useState(null);
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
   
   // Notify parent whenever visibleFiles changes
   useEffect(() => {
@@ -142,6 +144,9 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       if (onFileUploaded) {
         onFileUploaded(response.data);
       }
+      
+      // Load metadata for the uploaded file
+      checkAndLoadMetadata(response.data.fileId);
       
       // useEffect will automatically call onVisibleFilesChange when visibleFiles updates
 
@@ -307,6 +312,34 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
   }, [currentFileForMetadata]);
   
   /**
+   * Check if metadata exists for a file and load it
+   */
+  const checkAndLoadMetadata = useCallback(async (fileId) => {
+    if (!fileId) return;
+    
+    setLoadingMetadata(true);
+    try {
+      const response = await axios.get(`${API_URL}/api/check-metadata`, {
+        params: { fileId }
+      });
+      
+      if (response.data.exists && response.data.metadata) {
+        setLatestFileMetadata({
+          fileId: fileId,
+          data: response.data.metadata
+        });
+      } else {
+        setLatestFileMetadata(null);
+      }
+    } catch (err) {
+      console.error('Error checking metadata:', err);
+      setLatestFileMetadata(null);
+    } finally {
+      setLoadingMetadata(false);
+    }
+  }, []);
+  
+  /**
    * Generate PDF report (actual PDF generation)
    * 
    * This function calls the backend API to generate a PDF report.
@@ -463,6 +496,39 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
             Some files show reduced points for performance. Increase "Max Display Points" in the right panel to show more points on next upload.
           </Typography>
         </Alert>
+      )}
+
+      {/* Metadata Display */}
+      {latestFileMetadata && (
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+            📋 Latest File Metadata
+          </Typography>
+          {loadingMetadata ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : (
+            <Box sx={{ mt: 1 }}>
+              {Object.entries(latestFileMetadata.data).map(([key, value]) => (
+                value && (
+                  <Typography 
+                    key={key} 
+                    variant="caption" 
+                    display="block"
+                    sx={{ 
+                      mb: 0.5,
+                      color: 'text.secondary',
+                      wordBreak: 'break-word'
+                    }}
+                  >
+                    <strong>{key}:</strong> {value}
+                  </Typography>
+                )
+              ))}
+            </Box>
+          )}
+        </Paper>
       )}
 
       {/* File List */}
