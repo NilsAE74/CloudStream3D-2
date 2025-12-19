@@ -385,6 +385,70 @@ async function create3DVisualization(points) {
         ctx.fillRect(0, 0, chart.width, chart.height);
         ctx.restore();
       }
+    },
+    {
+      id: 'colorLegend',
+      afterDraw: (chart) => {
+        const ctx = chart.ctx;
+        const chartArea = chart.chartArea;
+        
+        // Legend dimensions and position
+        const legendWidth = 20;
+        const legendHeight = 200;
+        const legendX = chartArea.right - legendWidth - 10;
+        const legendY = chartArea.top + (chartArea.bottom - chartArea.top - legendHeight) / 2;
+        
+        // Draw gradient
+        const gradient = ctx.createLinearGradient(legendX, legendY + legendHeight, legendX, legendY);
+        
+        // Create color stops matching the viridis-like gradient used in the data
+        const steps = 20;
+        for (let i = 0; i <= steps; i++) {
+          const normalized = i / steps;
+          const r = Math.floor(255 * Math.max(0, Math.min(1, 1.5 - Math.abs(normalized - 0.5) * 2)));
+          const g = Math.floor(255 * normalized);
+          const b = Math.floor(255 * (1 - normalized));
+          gradient.addColorStop(i / steps, `rgb(${r}, ${g}, ${b})`);
+        }
+        
+        ctx.save();
+        ctx.fillStyle = gradient;
+        ctx.fillRect(legendX, legendY, legendWidth, legendHeight);
+        
+        // Draw border
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(legendX, legendY, legendWidth, legendHeight);
+        
+        // Add labels
+        ctx.fillStyle = '#333';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'left';
+        
+        // Max depth label (top)
+        const maxLabel = `${zMax.toFixed(2)} m`;
+        ctx.fillText(maxLabel, legendX + legendWidth + 5, legendY + 5);
+        
+        // Min depth label (bottom)
+        const minLabel = `${zMin.toFixed(2)} m`;
+        ctx.fillText(minLabel, legendX + legendWidth + 5, legendY + legendHeight);
+        
+        // Middle label
+        const midZ = (zMin + zMax) / 2;
+        const midLabel = `${midZ.toFixed(2)} m`;
+        ctx.fillText(midLabel, legendX + legendWidth + 5, legendY + legendHeight / 2);
+        
+        // "Depth (Z)" label
+        ctx.save();
+        ctx.translate(legendX - 5, legendY + legendHeight / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Depth (Z)', 0, 0);
+        ctx.restore();
+        
+        ctx.restore();
+      }
     }]
   };
   
