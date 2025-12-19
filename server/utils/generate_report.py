@@ -14,6 +14,7 @@ The PDF is optimized to stay under 2 MB through image compression.
 
 import sys
 import os
+import json
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for server environments
@@ -439,7 +440,6 @@ def main():
         print("="*60 + "\n")
         
         # Output JSON for Node.js to parse
-        import json
         result = {
             'success': True,
             'output_file': output_file,
@@ -450,7 +450,6 @@ def main():
         
     except Exception as e:
         print(f"ERROR: {str(e)}", file=sys.stderr)
-        import json
         result = {
             'success': False,
             'error': str(e)

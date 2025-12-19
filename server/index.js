@@ -11,6 +11,9 @@ const { importanceSampling, poissonDiskSampling } = require('./utils/sampling');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Python command (configurable via environment variable)
+const PYTHON_CMD = process.env.PYTHON_CMD || 'python3';
+
 // Middleware - Configure CORS to allow Codespaces URLs
 const corsOptions = {
   origin: function (origin, callback) {
@@ -407,7 +410,7 @@ app.post('/api/generate-report', async (req, res) => {
     
     // Call Python script to generate report
     const pythonScript = path.join(__dirname, 'utils', 'generate_report.py');
-    const pythonProcess = spawn('python3', [pythonScript, inputFile, outputFile]);
+    const pythonProcess = spawn(PYTHON_CMD, [pythonScript, inputFile, outputFile]);
     
     let stdout = '';
     let stderr = '';
