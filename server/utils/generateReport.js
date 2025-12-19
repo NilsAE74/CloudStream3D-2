@@ -72,18 +72,24 @@ function calculateStatistics(points) {
     };
   }
   
-  // Extract coordinates
+  // Calculate min, max, and extract values in a single pass to avoid stack overflow
+  let xMin = Infinity, xMax = -Infinity;
+  let yMin = Infinity, yMax = -Infinity;
+  let zMin = Infinity, zMax = -Infinity;
+  
+  for (const point of points) {
+    if (point.x < xMin) xMin = point.x;
+    if (point.x > xMax) xMax = point.x;
+    if (point.y < yMin) yMin = point.y;
+    if (point.y > yMax) yMax = point.y;
+    if (point.z < zMin) zMin = point.z;
+    if (point.z > zMax) zMax = point.z;
+  }
+  
+  // Extract coordinates for mean/std calculations
   const xValues = points.map(p => p.x);
   const yValues = points.map(p => p.y);
   const zValues = points.map(p => p.z);
-  
-  // Calculate min, max
-  const xMin = Math.min(...xValues);
-  const xMax = Math.max(...xValues);
-  const yMin = Math.min(...yValues);
-  const yMax = Math.max(...yValues);
-  const zMin = Math.min(...zValues);
-  const zMax = Math.max(...zValues);
   
   // Calculate means
   const xMean = xValues.reduce((a, b) => a + b, 0) / points.length;
@@ -168,9 +174,14 @@ function calculateNearestNeighborDistance(points, sampleSize = 1000) {
 async function createZHistogram(points) {
   console.log('[Visualization] Creating Z-histogram...');
   
-  const zValues = points.map(p => p.z);
-  const zMin = Math.min(...zValues);
-  const zMax = Math.max(...zValues);
+  // Find min/max without spread operator to avoid stack overflow
+  let zMin = Infinity;
+  let zMax = -Infinity;
+  for (const point of points) {
+    if (point.z < zMin) zMin = point.z;
+    if (point.z > zMax) zMax = point.z;
+  }
+  
   const binCount = 20;
   const binSize = (zMax - zMin) / binCount;
   
@@ -178,18 +189,22 @@ async function createZHistogram(points) {
   const bins = new Array(binCount).fill(0);
   const labels = [];
   
+  // Generate labels
   for (let i = 0; i < binCount; i++) {
     const binStart = zMin + i * binSize;
     labels.push(binStart.toFixed(2));
+  }
+  
+  // Bin the points in a single pass
+  for (const point of points) {
+    const z = point.z;
+    let binIndex = Math.floor((z - zMin) / binSize);
     
-    for (const z of zValues) {
-      if (i === binCount - 1) {
-        // Last bin includes max value
-        if (z >= binStart && z <= zMax) bins[i]++;
-      } else {
-        if (z >= binStart && z < binStart + binSize) bins[i]++;
-      }
-    }
+    // Handle edge case for maximum value
+    if (binIndex >= binCount) binIndex = binCount - 1;
+    if (binIndex < 0) binIndex = 0;
+    
+    bins[binIndex]++;
   }
   
   // Create chart
@@ -283,10 +298,13 @@ async function create3DVisualization(points) {
     console.log(`[Visualization] Downsampled to ${visPoints.length} points for visualization`);
   }
   
-  // Get Z range for coloring
-  const zValues = visPoints.map(p => p.z);
-  const zMin = Math.min(...zValues);
-  const zMax = Math.max(...zValues);
+  // Get Z range for coloring without spread operator to avoid stack overflow
+  let zMin = Infinity;
+  let zMax = -Infinity;
+  for (const point of visPoints) {
+    if (point.z < zMin) zMin = point.z;
+    if (point.z > zMax) zMax = point.z;
+  }
   const zRange = zMax - zMin || 1;
   
   // Create scatter plot with color based on Z
