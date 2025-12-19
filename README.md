@@ -168,7 +168,13 @@ Apply various transformations:
 
 ### 6. Generate PDF Report
 - Click "Generate PDF Report" button in the left panel under any uploaded file
+- **Metadata Workflow**: The system will check for a metadata file:
+  - If a `.txt` file with the same name exists, it will be included in the report
+  - If no metadata file exists, a form will appear to collect project information
+  - Metadata includes: Project name, Location, CRS, Scanner type, Date, Operator, Weather, Accuracy, etc.
+  - Metadata is saved to a `.txt` file for future use
 - The system will generate a comprehensive one-page analysis report including:
+  - **Project Information** (if metadata available)
   - Statistical summary (count, extent, mean, standard deviation)
   - Z-value histogram
   - 3D visualization with height-based coloring
@@ -176,6 +182,7 @@ Apply various transformations:
 - PDF file is automatically named `pointcloud_<filename>.pdf`
 - PDF size optimized to stay under 2 MB
 - Report downloads automatically when ready
+- See [METADATA_FEATURE.md](METADATA_FEATURE.md) for detailed metadata documentation
 
 ### 7. Export Data
 - Export the currently filtered dataset
@@ -237,11 +244,25 @@ Export point cloud data
 - **Body**: `{ points: Array, format: String }`
 - **Returns**: File download (CSV or XYZ)
 
+### `POST /api/check-metadata`
+Check if metadata file exists for an uploaded file
+- **Body**: `{ fileId: String }`
+- **Returns**: `{ exists: Boolean, metadataFilePath: String, metadata: Array }`
+- **Description**: Checks if a .txt metadata file exists with the same name as the uploaded file
+
+### `POST /api/save-metadata`
+Save metadata to a .txt file
+- **Body**: `{ fileId: String, metadata: Array }`
+- **Returns**: `{ success: Boolean, metadataFilePath: String, message: String }`
+- **Description**: Creates/overwrites a .txt metadata file with project information
+- **Validation**: Enforces max 100 lines, 500 chars per line, no control characters
+
 ### `POST /api/generate-report`
 Generate comprehensive PDF analysis report using JavaScript
 - **Body**: `{ fileId: String, originalFilename: String }`
 - **Returns**: PDF file download
 - **Features**:
+  - **Project Information section** (if metadata .txt file exists)
   - Complete statistical analysis (count, extent, mean, std dev)
   - Z-value histogram with 20 bins
   - 3D visualization (X-Y projection) with height-based coloring
