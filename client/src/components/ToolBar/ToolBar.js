@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Paper,
-  ToggleButton,
+  //ToggleButton,
   //ToggleButtonGroup,
   IconButton,
   Tooltip,
@@ -11,7 +11,7 @@ import {
   Refresh,
   Straighten,
   Palette,
-  Layers,
+  //Layers,
   GridOn,
   GridOff,
   LineAxis

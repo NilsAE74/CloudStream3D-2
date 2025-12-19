@@ -5,6 +5,14 @@ client/node_modules/
 # Build outputs
 client/build/
 dist/
+out/
+
+# Electron
+*.dmg
+*.AppImage
+*.deb
+*.exe
+*.nsis
 
 # Uploads
 uploads/

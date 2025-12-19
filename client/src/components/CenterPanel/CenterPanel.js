@@ -350,7 +350,7 @@ function CenterPanel({
     const centerZ = (stats.maxZ + stats.minZ) / 2;
 
     // Position camera at a distance to see the entire cloud
-    const distance = maxRange * 1.5;
+    const distance = maxRange * 5;
     
     // Position camera from the side with Z-axis pointing up
     // Camera looks from negative Y direction towards center
