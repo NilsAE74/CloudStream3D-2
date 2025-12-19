@@ -6,6 +6,7 @@ const fs = require('fs');
 const Papa = require('papaparse');
 const { invertZ, shiftData, rotateData } = require('./utils/transformations');
 const { importanceSampling, poissonDiskSampling } = require('./utils/sampling');
+const { generateReport } = require('./utils/generateReport');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -368,6 +369,83 @@ app.post('/api/export', (req, res) => {
   } catch (error) {
     console.error('Export error:', error);
     res.status(500).json({ error: error.message || 'Error exporting data' });
+  }
+});
+
+// Generate PDF report
+app.post('/api/generate-report', async (req, res) => {
+  try {
+    const { fileId, originalFilename } = req.body;
+    
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    // Construct path to uploaded file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Check if file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Generate output filename based on original filename
+    const baseFilename = originalFilename 
+      ? originalFilename.replace(/\.[^/.]+$/, '') // Remove extension
+      : 'pointcloud';
+    const outputFilename = `pointcloud_${baseFilename}.pdf`;
+    const outputFile = path.join(uploadDir, outputFilename);
+    
+    console.log('\n' + '='.repeat(60));
+    console.log('PDF REPORT GENERATION REQUEST');
+    console.log('='.repeat(60));
+    console.log(`Input file: ${fileId}`);
+    console.log(`Original filename: ${originalFilename}`);
+    console.log(`Output file: ${outputFilename}`);
+    console.log('='.repeat(60));
+    
+    // Call JavaScript report generator
+    const result = await generateReport(inputFile, outputFile);
+    
+    if (!result.success) {
+      console.error('Report generation failed:', result.error);
+      return res.status(500).json({ 
+        error: 'Failed to generate report', 
+        details: result.error
+      });
+    }
+    
+    // Check if output file was created
+    if (!fs.existsSync(outputFile)) {
+      return res.status(500).json({ error: 'Report file was not generated' });
+    }
+    
+    console.log('\n' + '='.repeat(60));
+    console.log('PDF REPORT GENERATION COMPLETED');
+    console.log('='.repeat(60) + '\n');
+    
+    // Send the PDF file
+    res.download(outputFile, outputFilename, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Error sending report file' });
+        }
+      }
+      
+      // Optional: Clean up the PDF file after sending
+      // Uncomment the following lines if you want to delete the PDF after download
+      // setTimeout(() => {
+      //   if (fs.existsSync(outputFile)) {
+      //     fs.unlinkSync(outputFile);
+      //   }
+      // }, 1000);
+    });
+    
+  } catch (error) {
+    console.error('Report generation error:', error);
+    res.status(500).json({ error: error.message || 'Error generating report' });
   }
 });
 

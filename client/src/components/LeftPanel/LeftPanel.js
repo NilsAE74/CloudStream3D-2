@@ -15,7 +15,8 @@ import {
 import {
   CloudUpload,
   Delete,
-  Description
+  Description,
+  Assessment
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -41,6 +42,8 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [visibleFiles, setVisibleFiles] = useState(new Set());
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [selectedFileForReport, setSelectedFileForReport] = useState(null);
   
   // Notify parent whenever visibleFiles changes
   useEffect(() => {
@@ -212,6 +215,71 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     });
     // useEffect will automatically call onVisibleFilesChange
   }, []);
+  
+  // Generate PDF report for a specific file
+  const handleGenerateReport = useCallback(async (file) => {
+    setGeneratingReport(true);
+    setSelectedFileForReport(file.id);
+    setError(null);
+    
+    try {
+      console.log('Generating report for file:', file.name, 'ID:', file.id);
+      
+      const response = await axios.post(
+        `${API_URL}/api/generate-report`,
+        {
+          fileId: file.id,
+          originalFilename: file.name
+        },
+        {
+          responseType: 'blob', // Important for receiving PDF file
+          timeout: 300000 // 5 minutes timeout
+        }
+      );
+      
+      // Create download link for the PDF
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Extract filename from original or use default
+      const baseFilename = file.name.replace(/\.[^/.]+$/, '');
+      link.download = `pointcloud_${baseFilename}.pdf`;
+      
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('Report generated and downloaded successfully');
+      
+    } catch (err) {
+      console.error('Report generation error:', err);
+      
+      let errorMessage = 'Failed to generate report. Please try again.';
+      
+      if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+        errorMessage = 'Report generation timeout. The file may be too large. Please try a smaller file.';
+      } else if (err.response?.data) {
+        // Try to extract error message from blob response
+        try {
+          const text = await err.response.data.text();
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // If we can't parse it, use default message
+        }
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setGeneratingReport(false);
+      setSelectedFileForReport(null);
+    }
+  }, []);
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 2 }}>
@@ -316,7 +384,28 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
             files.map((file) => (
               <ListItem
                 key={file.id}
-                secondaryAction={
+                sx={{ 
+                  flexDirection: 'column',
+                  alignItems: 'stretch',
+                  py: 1.5
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                  <Checkbox
+                    checked={visibleFiles.has(file.id)}
+                    onChange={() => handleToggleVisibility(file.id)}
+                    sx={{ mr: 1 }}
+                  />
+                  <Description sx={{ mr: 2 }} />
+                  <ListItemText
+                    primary={file.name}
+                    secondary={
+                      file.downsamplingApplied
+                        ? `${file.displayedPoints.toLocaleString()} / ${file.points.toLocaleString()} points (downsampled)`
+                        : `${file.points.toLocaleString()} points`
+                    }
+                    sx={{ flex: 1 }}
+                  />
                   <IconButton 
                     edge="end" 
                     aria-label="delete"
@@ -324,22 +413,29 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
                   >
                     <Delete />
                   </IconButton>
-                }
-              >
-                <Checkbox
-                  checked={visibleFiles.has(file.id)}
-                  onChange={() => handleToggleVisibility(file.id)}
-                  sx={{ mr: 1 }}
-                />
-                <Description sx={{ mr: 2 }} />
-                <ListItemText
-                  primary={file.name}
-                  secondary={
-                    file.downsamplingApplied
-                      ? `${file.displayedPoints.toLocaleString()} / ${file.points.toLocaleString()} points (downsampled)`
-                      : `${file.points.toLocaleString()} points`
-                  }
-                />
+                </Box>
+                <Box sx={{ mt: 1, width: '100%' }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    startIcon={
+                      generatingReport && selectedFileForReport === file.id 
+                        ? <CircularProgress size={16} /> 
+                        : <Assessment />
+                    }
+                    disabled={generatingReport}
+                    onClick={() => handleGenerateReport(file)}
+                    sx={{ 
+                      textTransform: 'none',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    {generatingReport && selectedFileForReport === file.id
+                      ? 'Generating Report...'
+                      : 'Generate PDF Report'}
+                  </Button>
+                </Box>
               </ListItem>
             ))
           )}

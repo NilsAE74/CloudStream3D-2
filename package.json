@@ -11,17 +11,25 @@
     "build": "cd client && npm run build",
     "install-all": "npm install && cd client && npm install"
   },
-  "keywords": ["point-cloud", "3d-visualization", "xyz-data"],
+  "keywords": [
+    "point-cloud",
+    "3d-visualization",
+    "xyz-data"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
+    "canvas": "^3.2.0",
+    "chart.js": "^4.5.1",
+    "chartjs-node-canvas": "^5.0.0",
     "cors": "^2.8.5",
+    "express": "^4.18.2",
     "multer": "^2.0.2",
-    "papaparse": "^5.4.1"
+    "papaparse": "^5.4.1",
+    "pdfkit": "^0.17.2"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.1"
   }
 }

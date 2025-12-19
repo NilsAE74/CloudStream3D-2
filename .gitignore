@@ -8,6 +8,7 @@ dist/
 
 # Uploads
 uploads/
+*.pdf
 
 # Environment
 .env
