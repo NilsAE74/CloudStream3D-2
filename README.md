@@ -285,6 +285,26 @@ Generate comprehensive PDF analysis report using JavaScript
 - **Chart.js**: Flexible charting library
 - **Material-UI**: Pre-built React components with theming
 
+### Testing
+
+The application includes automated tests for the metadata functionality:
+
+```bash
+# Run metadata tests
+npm test
+
+# Or specifically
+npm run test:metadata
+```
+
+The test suite verifies:
+- Metadata files are correctly read when they exist
+- Metadata files are correctly created when they don't exist
+- PDF generation works with and without metadata
+- Empty metadata files are handled properly
+
+See [METADATA_FEATURE.md](METADATA_FEATURE.md) for detailed testing documentation.
+
 ## Performance Considerations
 
 ### Point Downsampling

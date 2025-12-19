@@ -253,6 +253,59 @@ if (!response.data.exists) {
 
 ## Testing
 
+### Automated Test Suite
+
+A comprehensive test suite has been created to verify metadata functionality. The test suite includes:
+
+1. **Test 1: Read Existing Metadata** - Verifies that metadata files are correctly read when they exist
+2. **Test 2: Report Generation Without Metadata** - Verifies report generation works without metadata
+3. **Test 3: Report Generation With Metadata** - Verifies metadata is included in reports when available
+4. **Test 4: Metadata File Creation** - Verifies the workflow for creating new metadata files
+5. **Test 5: Empty Metadata File Handling** - Verifies handling of empty metadata files
+
+#### Running the Tests
+
+```bash
+# Run all metadata tests
+npm test
+
+# Or run directly
+npm run test:metadata
+
+# Or run the test file directly
+node server/utils/generateReport.test.js
+```
+
+#### Test Output
+
+When all tests pass, you'll see:
+
+```
+============================================================
+METADATA FUNCTIONALITY TEST SUITE
+============================================================
+
+=== Test 1: Read Existing Metadata ===
+✓ Created test metadata file
+✓ Metadata file exists
+✓ Metadata was read successfully
+✓ Metadata has correct number of lines: 6
+✓ All metadata lines match expected content
+✅ Test 1 PASSED: Metadata file is read correctly when it exists
+
+[... additional tests ...]
+
+============================================================
+TEST SUMMARY
+============================================================
+
+Total tests: 5
+Passed: 5
+Failed: 0
+
+🎉 All tests PASSED!
+```
+
 ### Manual Testing
 
 1. **Test with existing metadata:**
