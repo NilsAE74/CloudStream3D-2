@@ -460,23 +460,49 @@ async function create3DVisualization(points) {
 
 /**
  * Read metadata from .txt file
+ * 
+ * This function checks if a metadata .txt file exists in the same folder as the
+ * imported .xyz file with the same name. If found, it reads all non-empty lines
+ * from the file and returns them as an array.
+ * 
+ * Expected metadata format (example):
+ * # Project: Test Project Name
+ * # Location: Berlin, Germany
+ * # CRS: EPSG:25832 (UTM Zone 32N)
+ * # Scanner: Leica ScanStation P50
+ * # Scan Date: 2025-12-19
+ * # Operator: John Doe
+ * # Weather: Clear, sunny
+ * # Accuracy: ±2mm
+ * # Software: Cyclone REGISTER 360
+ * # Notes: High-quality scan with no obstructions
+ * # Point Format: XYZ
+ * # Units: Meters
+ * 
  * @param {string} metadataFilePath - Path to the metadata .txt file
- * @returns {Array<string>} Array of metadata lines
+ * @returns {Array<string>|null} Array of metadata lines if file exists, null otherwise
  */
 function readMetadata(metadataFilePath) {
   console.log(`[Metadata] Reading metadata from: ${metadataFilePath}`);
   
   try {
+    // Step 1: Check if the metadata file exists
     if (fs.existsSync(metadataFilePath)) {
+      // Step 2: Read the file content as UTF-8 text
       const content = fs.readFileSync(metadataFilePath, 'utf-8');
+      
+      // Step 3: Split content into lines and filter out empty lines
       const lines = content.split('\n').filter(line => line.trim() !== '');
+      
       console.log(`[Metadata] Found ${lines.length} lines of metadata`);
       return lines;
     } else {
+      // No metadata file found - this is not an error, just log it
       console.log('[Metadata] No metadata file found');
       return null;
     }
   } catch (error) {
+    // Handle any errors during file reading (e.g., permission issues)
     console.error('[Metadata] Error reading metadata file:', error.message);
     return null;
   }
@@ -536,8 +562,14 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
       
       doc.moveDown(0.5);
       
-      // Add Metadata Section if available
+      // ========================================
+      // METADATA SECTION
+      // ========================================
+      // Add Project Information section if metadata was provided
+      // Metadata is read from a .txt file with the same name as the .xyz file
+      // This section includes project details like location, scanner, operator, etc.
       if (metadata && metadata.length > 0) {
+        // Section title
         doc.fontSize(11)
            .font('Helvetica-Bold')
            .fillColor('#2c3e50')
@@ -545,11 +577,12 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
         
         doc.moveDown(0.3);
         
-        // Display metadata lines in a formatted way
+        // Display each metadata line in a formatted way
         doc.fontSize(8)
            .font('Helvetica')
            .fillColor('#2c3e50');
         
+        // Iterate through all metadata lines and add them to the PDF
         metadata.forEach(line => {
           doc.text(line, { align: 'left' });
         });
@@ -692,18 +725,30 @@ async function generateReport(inputFile, outputFile, originalFilename = null) {
     const histogramBuffer = await createZHistogram(points);
     const vizBuffer = await create3DVisualization(points);
     
-    // Check for metadata file (same name as input file but with .txt extension)
-    // Get the directory and base filename (without extension) of the input file
+    // ========================================
+    // METADATA FILE HANDLING
+    // ========================================
+    // Step 1: Check for metadata file
+    // The metadata file should have the same name as the input file but with .txt extension
+    // For example, if input is "scan-data.xyz", look for "scan-data.txt"
+    
+    // Get the directory where the input file is located
     const inputDir = path.dirname(inputFile);
+    
+    // Get the base filename without extension (e.g., "scan-data.xyz" -> "scan-data")
     const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    
+    // Construct the full path to the metadata file
     const metadataFilePath = path.join(inputDir, inputBasename + '.txt');
     
     console.log(`[Metadata] Checking for metadata file: ${metadataFilePath}`);
     
-    // Read metadata if it exists
+    // Step 2: Read metadata if the file exists
+    // If the file doesn't exist, readMetadata() will return null and the report
+    // will be generated without the Project Information section
     const metadata = readMetadata(metadataFilePath);
     
-    // Generate PDF report
+    // Step 3: Generate PDF report with or without metadata
     const displayFilename = originalFilename || path.basename(inputFile);
     await generatePDFReport(
       points, stats, avgNNDistance,

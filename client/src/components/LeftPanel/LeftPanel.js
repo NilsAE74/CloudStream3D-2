@@ -219,7 +219,16 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     // useEffect will automatically call onVisibleFilesChange
   }, []);
   
-  // Check if metadata exists for a file and initiate report generation workflow
+  /**
+   * Handle PDF report generation button click
+   * 
+   * This function implements the metadata workflow:
+   * 1. Check if a .txt metadata file exists for the uploaded .xyz file
+   * 2. If metadata exists: Proceed directly to PDF generation
+   * 3. If metadata doesn't exist: Show form to collect metadata from user
+   * 
+   * @param {Object} file - The file object for which to generate the report
+   */
   const handleGenerateReport = useCallback(async (file) => {
     setSelectedFileForReport(file.id);
     setError(null);
@@ -227,19 +236,20 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     try {
       console.log('Checking for metadata for file:', file.name, 'ID:', file.id);
       
-      // Step 1: Check if metadata file exists
+      // Step 1: Check if metadata file exists in the uploads folder
       const checkResponse = await axios.post(
         `${API_URL}/api/check-metadata`,
         { fileId: file.id },
         { timeout: 30000 }
       );
       
+      // Step 2: Branch based on metadata existence
       if (checkResponse.data.exists) {
-        // Metadata exists, proceed directly to report generation
+        // Metadata file already exists, proceed directly to report generation
         console.log('Metadata file exists, generating report...');
         await generatePDFReport(file);
       } else {
-        // Metadata doesn't exist, show form to collect metadata
+        // No metadata file found, show form to collect metadata from user
         console.log('No metadata file found, showing metadata form...');
         setCurrentFileForMetadata(file);
         setMetadataDialogOpen(true);
@@ -252,7 +262,14 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     }
   }, []);
   
-  // Save metadata and generate report
+  /**
+   * Save metadata and generate report
+   * 
+   * This function is called when the user submits the metadata form.
+   * It saves the metadata to a .txt file and then generates the PDF report.
+   * 
+   * @param {Array<string>} metadataLines - Array of metadata lines from the form
+   */
   const handleSaveMetadata = useCallback(async (metadataLines) => {
     if (!currentFileForMetadata) return;
     
@@ -261,7 +278,8 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     try {
       console.log('Saving metadata for file:', currentFileForMetadata.name);
       
-      // Step 1: Save metadata to file
+      // Step 1: Save metadata to .txt file
+      // This creates a new file with the same name as the .xyz file but .txt extension
       await axios.post(
         `${API_URL}/api/save-metadata`,
         {
@@ -273,10 +291,10 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       
       console.log('Metadata saved successfully');
       
-      // Step 2: Close dialog
+      // Step 2: Close the metadata dialog
       setMetadataDialogOpen(false);
       
-      // Step 3: Generate report
+      // Step 3: Generate the PDF report (which will now include the metadata)
       await generatePDFReport(currentFileForMetadata);
       
     } catch (err) {
@@ -288,13 +306,23 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     }
   }, [currentFileForMetadata]);
   
-  // Generate PDF report (actual PDF generation)
+  /**
+   * Generate PDF report (actual PDF generation)
+   * 
+   * This function calls the backend API to generate a PDF report.
+   * The backend will automatically include metadata if a .txt file exists.
+   * When the PDF is ready, it's automatically downloaded to the user's computer.
+   * 
+   * @param {Object} file - The file object for which to generate the report
+   */
   const generatePDFReport = useCallback(async (file) => {
     setGeneratingReport(true);
     
     try {
       console.log('Generating PDF report for file:', file.name, 'ID:', file.id);
       
+      // Step 1: Call the backend API to generate the PDF
+      // The response will be a binary PDF file (blob)
       const response = await axios.post(
         `${API_URL}/api/generate-report`,
         {
@@ -307,20 +335,21 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
         }
       );
       
-      // Create download link for the PDF
+      // Step 2: Create a download link for the PDF
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       
-      // Extract filename from original or use default
+      // Step 3: Set the filename for the download
       const baseFilename = file.name.replace(/\.[^/.]+$/, '');
       link.download = `pointcloud_${baseFilename}.pdf`;
       
+      // Step 4: Trigger the download
       document.body.appendChild(link);
       link.click();
       
-      // Cleanup
+      // Step 5: Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       

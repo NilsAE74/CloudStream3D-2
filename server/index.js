@@ -372,30 +372,47 @@ app.post('/api/export', (req, res) => {
   }
 });
 
-// Check if metadata file exists for a given file
+/**
+ * API Endpoint: Check if metadata file exists for a given file
+ * 
+ * This endpoint checks if a .txt metadata file exists in the same folder
+ * as the uploaded .xyz file with the same name.
+ * 
+ * Request body:
+ *   - fileId: The ID of the uploaded file (filename in uploads directory)
+ * 
+ * Response:
+ *   - exists: Boolean indicating if metadata file exists
+ *   - metadataFilePath: Full path to the metadata file
+ *   - metadata: Array of metadata lines if file exists, null otherwise
+ */
 app.post('/api/check-metadata', (req, res) => {
   try {
     const { fileId } = req.body;
     
+    // Validate request
     if (!fileId) {
       return res.status(400).json({ error: 'File ID is required' });
     }
     
-    // Construct path to uploaded file and metadata file
+    // Step 1: Construct path to uploaded file
     const uploadDir = path.join(__dirname, '../uploads');
     const inputFile = path.join(uploadDir, fileId);
     
-    // Check if original file exists
+    // Step 2: Verify that the original file exists
     if (!fs.existsSync(inputFile)) {
       return res.status(404).json({ error: 'Input file not found' });
     }
     
-    // Get metadata file path (same name, but .txt extension)
+    // Step 3: Determine metadata file path
+    // Get base filename without extension and append .txt
     const inputBasename = path.basename(inputFile, path.extname(inputFile));
     const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
     
+    // Step 4: Check if metadata file exists
     const metadataExists = fs.existsSync(metadataFilePath);
     
+    // Step 5: If metadata exists, read and return its content
     let metadata = null;
     if (metadataExists) {
       try {
@@ -406,6 +423,7 @@ app.post('/api/check-metadata', (req, res) => {
       }
     }
     
+    // Step 6: Return response
     res.json({
       exists: metadataExists,
       metadataFilePath: metadataFilePath,
@@ -418,11 +436,27 @@ app.post('/api/check-metadata', (req, res) => {
   }
 });
 
-// Save metadata to a .txt file
+/**
+ * API Endpoint: Save metadata to a .txt file
+ * 
+ * This endpoint creates a new .txt file with the same name as the uploaded
+ * .xyz file and saves the provided metadata lines to it. The metadata will
+ * then be included in future PDF reports.
+ * 
+ * Request body:
+ *   - fileId: The ID of the uploaded file (filename in uploads directory)
+ *   - metadata: Array of metadata lines (strings) to save
+ * 
+ * Response:
+ *   - success: Boolean indicating if save was successful
+ *   - metadataFilePath: Full path to the saved metadata file
+ *   - message: Success message
+ */
 app.post('/api/save-metadata', (req, res) => {
   try {
     const { fileId, metadata } = req.body;
     
+    // Validate request
     if (!fileId) {
       return res.status(400).json({ error: 'File ID is required' });
     }
@@ -431,25 +465,28 @@ app.post('/api/save-metadata', (req, res) => {
       return res.status(400).json({ error: 'Metadata must be an array of strings' });
     }
     
-    // Construct path to uploaded file
+    // Step 1: Construct path to uploaded file
     const uploadDir = path.join(__dirname, '../uploads');
     const inputFile = path.join(uploadDir, fileId);
     
-    // Check if original file exists
+    // Step 2: Verify that the original file exists
     if (!fs.existsSync(inputFile)) {
       return res.status(404).json({ error: 'Input file not found' });
     }
     
-    // Get metadata file path (same name, but .txt extension)
+    // Step 3: Determine metadata file path
+    // Get base filename without extension and append .txt
     const inputBasename = path.basename(inputFile, path.extname(inputFile));
     const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
     
-    // Write metadata to file
+    // Step 4: Write metadata to file
+    // Join all metadata lines with newline characters
     const content = metadata.join('\n');
     fs.writeFileSync(metadataFilePath, content, 'utf-8');
     
     console.log(`[Metadata] Saved metadata to: ${metadataFilePath}`);
     
+    // Step 5: Return success response
     res.json({
       success: true,
       metadataFilePath: metadataFilePath,
