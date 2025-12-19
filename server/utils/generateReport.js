@@ -459,6 +459,30 @@ async function create3DVisualization(points) {
 }
 
 /**
+ * Read metadata from .txt file
+ * @param {string} metadataFilePath - Path to the metadata .txt file
+ * @returns {Array<string>} Array of metadata lines
+ */
+function readMetadata(metadataFilePath) {
+  console.log(`[Metadata] Reading metadata from: ${metadataFilePath}`);
+  
+  try {
+    if (fs.existsSync(metadataFilePath)) {
+      const content = fs.readFileSync(metadataFilePath, 'utf-8');
+      const lines = content.split('\n').filter(line => line.trim() !== '');
+      console.log(`[Metadata] Found ${lines.length} lines of metadata`);
+      return lines;
+    } else {
+      console.log('[Metadata] No metadata file found');
+      return null;
+    }
+  } catch (error) {
+    console.error('[Metadata] Error reading metadata file:', error.message);
+    return null;
+  }
+}
+
+/**
  * Generate PDF report
  * @param {Array<{x: number, y: number, z: number}>} points - Array of points
  * @param {Object} stats - Statistics object
@@ -467,9 +491,10 @@ async function create3DVisualization(points) {
  * @param {Buffer} vizBuffer - 3D visualization image buffer
  * @param {string} outputPath - Path where PDF will be saved
  * @param {string} originalFilename - Original input filename
+ * @param {Array<string>|null} metadata - Optional metadata lines to include in report
  * @returns {Promise<string>} Output path
  */
-async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, vizBuffer, outputPath, originalFilename) {
+async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, vizBuffer, outputPath, originalFilename, metadata = null) {
   console.log('[Report] Generating PDF report...');
   
   return new Promise((resolve, reject) => {
@@ -510,6 +535,27 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
          );
       
       doc.moveDown(0.5);
+      
+      // Add Metadata Section if available
+      if (metadata && metadata.length > 0) {
+        doc.fontSize(11)
+           .font('Helvetica-Bold')
+           .fillColor('#2c3e50')
+           .text('Project Information');
+        
+        doc.moveDown(0.3);
+        
+        // Display metadata lines in a formatted way
+        doc.fontSize(8)
+           .font('Helvetica')
+           .fillColor('#2c3e50');
+        
+        metadata.forEach(line => {
+          doc.text(line, { align: 'left' });
+        });
+        
+        doc.moveDown(0.5);
+      }
       
       // Statistics Section
       doc.fontSize(11)
@@ -646,12 +692,23 @@ async function generateReport(inputFile, outputFile, originalFilename = null) {
     const histogramBuffer = await createZHistogram(points);
     const vizBuffer = await create3DVisualization(points);
     
+    // Check for metadata file (same name as input file but with .txt extension)
+    // Get the directory and base filename (without extension) of the input file
+    const inputDir = path.dirname(inputFile);
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(inputDir, inputBasename + '.txt');
+    
+    console.log(`[Metadata] Checking for metadata file: ${metadataFilePath}`);
+    
+    // Read metadata if it exists
+    const metadata = readMetadata(metadataFilePath);
+    
     // Generate PDF report
     const displayFilename = originalFilename || path.basename(inputFile);
     await generatePDFReport(
       points, stats, avgNNDistance,
       histogramBuffer, vizBuffer,
-      outputFile, displayFilename
+      outputFile, displayFilename, metadata
     );
     
     console.log('='.repeat(60));
@@ -698,4 +755,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { generateReport };
+module.exports = { generateReport, readMetadata };

@@ -372,6 +372,96 @@ app.post('/api/export', (req, res) => {
   }
 });
 
+// Check if metadata file exists for a given file
+app.post('/api/check-metadata', (req, res) => {
+  try {
+    const { fileId } = req.body;
+    
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    // Construct path to uploaded file and metadata file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Check if original file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Get metadata file path (same name, but .txt extension)
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
+    
+    const metadataExists = fs.existsSync(metadataFilePath);
+    
+    let metadata = null;
+    if (metadataExists) {
+      try {
+        const content = fs.readFileSync(metadataFilePath, 'utf-8');
+        metadata = content.split('\n').filter(line => line.trim() !== '');
+      } catch (error) {
+        console.error('Error reading metadata:', error);
+      }
+    }
+    
+    res.json({
+      exists: metadataExists,
+      metadataFilePath: metadataFilePath,
+      metadata: metadata
+    });
+    
+  } catch (error) {
+    console.error('Check metadata error:', error);
+    res.status(500).json({ error: error.message || 'Error checking metadata' });
+  }
+});
+
+// Save metadata to a .txt file
+app.post('/api/save-metadata', (req, res) => {
+  try {
+    const { fileId, metadata } = req.body;
+    
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    if (!metadata || !Array.isArray(metadata)) {
+      return res.status(400).json({ error: 'Metadata must be an array of strings' });
+    }
+    
+    // Construct path to uploaded file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Check if original file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Get metadata file path (same name, but .txt extension)
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
+    
+    // Write metadata to file
+    const content = metadata.join('\n');
+    fs.writeFileSync(metadataFilePath, content, 'utf-8');
+    
+    console.log(`[Metadata] Saved metadata to: ${metadataFilePath}`);
+    
+    res.json({
+      success: true,
+      metadataFilePath: metadataFilePath,
+      message: 'Metadata saved successfully'
+    });
+    
+  } catch (error) {
+    console.error('Save metadata error:', error);
+    res.status(500).json({ error: error.message || 'Error saving metadata' });
+  }
+});
+
 // Generate PDF report
 app.post('/api/generate-report', async (req, res) => {
   try {

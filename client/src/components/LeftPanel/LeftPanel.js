@@ -19,6 +19,7 @@ import {
   Assessment
 } from '@mui/icons-material';
 import axios from 'axios';
+import MetadataDialog from '../MetadataDialog/MetadataDialog';
 
 // Use environment variable or construct from window location in Codespaces
 const getApiUrl = () => {
@@ -44,6 +45,8 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
   const [visibleFiles, setVisibleFiles] = useState(new Set());
   const [generatingReport, setGeneratingReport] = useState(false);
   const [selectedFileForReport, setSelectedFileForReport] = useState(null);
+  const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
+  const [currentFileForMetadata, setCurrentFileForMetadata] = useState(null);
   
   // Notify parent whenever visibleFiles changes
   useEffect(() => {
@@ -216,14 +219,81 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     // useEffect will automatically call onVisibleFilesChange
   }, []);
   
-  // Generate PDF report for a specific file
+  // Check if metadata exists for a file and initiate report generation workflow
   const handleGenerateReport = useCallback(async (file) => {
-    setGeneratingReport(true);
     setSelectedFileForReport(file.id);
     setError(null);
     
     try {
-      console.log('Generating report for file:', file.name, 'ID:', file.id);
+      console.log('Checking for metadata for file:', file.name, 'ID:', file.id);
+      
+      // Step 1: Check if metadata file exists
+      const checkResponse = await axios.post(
+        `${API_URL}/api/check-metadata`,
+        { fileId: file.id },
+        { timeout: 30000 }
+      );
+      
+      if (checkResponse.data.exists) {
+        // Metadata exists, proceed directly to report generation
+        console.log('Metadata file exists, generating report...');
+        await generatePDFReport(file);
+      } else {
+        // Metadata doesn't exist, show form to collect metadata
+        console.log('No metadata file found, showing metadata form...');
+        setCurrentFileForMetadata(file);
+        setMetadataDialogOpen(true);
+      }
+      
+    } catch (err) {
+      console.error('Error checking metadata:', err);
+      setError('Failed to check metadata. Please try again.');
+      setSelectedFileForReport(null);
+    }
+  }, []);
+  
+  // Save metadata and generate report
+  const handleSaveMetadata = useCallback(async (metadataLines) => {
+    if (!currentFileForMetadata) return;
+    
+    setGeneratingReport(true);
+    
+    try {
+      console.log('Saving metadata for file:', currentFileForMetadata.name);
+      
+      // Step 1: Save metadata to file
+      await axios.post(
+        `${API_URL}/api/save-metadata`,
+        {
+          fileId: currentFileForMetadata.id,
+          metadata: metadataLines
+        },
+        { timeout: 30000 }
+      );
+      
+      console.log('Metadata saved successfully');
+      
+      // Step 2: Close dialog
+      setMetadataDialogOpen(false);
+      
+      // Step 3: Generate report
+      await generatePDFReport(currentFileForMetadata);
+      
+    } catch (err) {
+      console.error('Error saving metadata:', err);
+      setError('Failed to save metadata. Please try again.');
+    } finally {
+      setGeneratingReport(false);
+      setCurrentFileForMetadata(null);
+    }
+  }, [currentFileForMetadata]);
+  
+  // Generate PDF report (actual PDF generation)
+  const generatePDFReport = useCallback(async (file) => {
+    setGeneratingReport(true);
+    
+    try {
+      console.log('Generating PDF report for file:', file.name, 'ID:', file.id);
       
       const response = await axios.post(
         `${API_URL}/api/generate-report`,
@@ -441,6 +511,18 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
           )}
         </List>
       </Paper>
+      
+      {/* Metadata Dialog */}
+      <MetadataDialog
+        open={metadataDialogOpen}
+        onClose={() => {
+          setMetadataDialogOpen(false);
+          setCurrentFileForMetadata(null);
+          setSelectedFileForReport(null);
+        }}
+        onSave={handleSaveMetadata}
+        loading={generatingReport}
+      />
     </Box>
   );
 }
