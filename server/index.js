@@ -6,7 +6,7 @@ const fs = require('fs');
 const Papa = require('papaparse');
 const { invertZ, shiftData, rotateData } = require('./utils/transformations');
 const { importanceSampling, poissonDiskSampling } = require('./utils/sampling');
-const { generateReport } = require('./utils/generateReport');
+const { generateReport, readMetadata } = require('./utils/generateReport');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -409,21 +409,12 @@ app.post('/api/check-metadata', (req, res) => {
     const inputBasename = path.basename(inputFile, path.extname(inputFile));
     const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
     
-    // Step 4: Check if metadata file exists
-    const metadataExists = fs.existsSync(metadataFilePath);
+    // Step 4: Use the readMetadata function to check and read metadata
+    // This ensures consistency with the PDF generation logic
+    const metadata = readMetadata(metadataFilePath);
+    const metadataExists = metadata !== null;
     
-    // Step 5: If metadata exists, read and return its content
-    let metadata = null;
-    if (metadataExists) {
-      try {
-        const content = fs.readFileSync(metadataFilePath, 'utf-8');
-        metadata = content.split('\n').filter(line => line.trim() !== '');
-      } catch (error) {
-        console.error('Error reading metadata:', error);
-      }
-    }
-    
-    // Step 6: Return response
+    // Step 5: Return response
     res.json({
       exists: metadataExists,
       metadataFilePath: metadataFilePath,
