@@ -496,7 +496,7 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
       doc.fontSize(9)
          .font('Helvetica-Oblique')
          .fillColor('#2c3e50')
-         .text(`File: ${originalFilename} | Generated: ${dateStr}`, { align: 'center' });
+         .text(`File: ${originalFilename} | Generated: ${dateStr}`, { align: 'left' });
       
       doc.moveDown(0.5);
       
@@ -504,7 +504,7 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
       doc.fontSize(9)
          .font('Helvetica')
          .text(
-           'This report provides comprehensive statistical analysis and visualization of the uploaded point cloud data, ' +
+           'This report provides a statistical analysis and visualization of the uploaded point cloud data, ' +
            'including spatial extent, distribution metrics, and 3D visualization with height-based coloring.',
            { align: 'left' }
          );
@@ -624,9 +624,10 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
  * Main function to generate report
  * @param {string} inputFile - Path to input XYZ file
  * @param {string} outputFile - Path to output PDF file
+ * @param {string} originalFilename - Original filename for display in report
  * @returns {Promise<Object>} Result object with success status
  */
-async function generateReport(inputFile, outputFile) {
+async function generateReport(inputFile, outputFile, originalFilename = null) {
   console.log('\n' + '='.repeat(60));
   console.log('POINT CLOUD ANALYSIS AND REPORT GENERATION (JavaScript)');
   console.log('='.repeat(60));
@@ -646,11 +647,11 @@ async function generateReport(inputFile, outputFile) {
     const vizBuffer = await create3DVisualization(points);
     
     // Generate PDF report
-    const originalFilename = path.basename(inputFile);
+    const displayFilename = originalFilename || path.basename(inputFile);
     await generatePDFReport(
       points, stats, avgNNDistance,
       histogramBuffer, vizBuffer,
-      outputFile, originalFilename
+      outputFile, displayFilename
     );
     
     console.log('='.repeat(60));

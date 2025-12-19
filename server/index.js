@@ -406,7 +406,7 @@ app.post('/api/generate-report', async (req, res) => {
     console.log('='.repeat(60));
     
     // Call JavaScript report generator
-    const result = await generateReport(inputFile, outputFile);
+    const result = await generateReport(inputFile, outputFile, originalFilename);
     
     if (!result.success) {
       console.error('Report generation failed:', result.error);
