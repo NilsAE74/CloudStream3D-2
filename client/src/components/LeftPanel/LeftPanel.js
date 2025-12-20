@@ -57,16 +57,30 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, onFileSelect, selecte
   const handleFileSelect = useCallback(async (selectedFiles) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
 
-    const file = selectedFiles[0];
-    
-    // Validate file type
+    // Validate all file types
     const validExtensions = ['.csv', '.xyz', '.txt'];
-    const fileExt = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    const files = Array.from(selectedFiles);
     
-    if (!validExtensions.includes(fileExt)) {
-      setError('Invalid file type. Please upload CSV, XYZ, or TXT files.');
+    for (const file of files) {
+      const fileExt = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      if (!validExtensions.includes(fileExt)) {
+        setError('Invalid file type. Please upload CSV, XYZ, or TXT files.');
+        return;
+      }
+    }
+    
+    // Find the point cloud file (.xyz or .csv)
+    const pointCloudFile = files.find(f => {
+      const ext = f.name.toLowerCase().substring(f.name.lastIndexOf('.'));
+      return ext === '.xyz' || ext === '.csv';
+    });
+    
+    if (!pointCloudFile) {
+      setError('Please select at least one .xyz or .csv file.');
       return;
     }
+    
+    const file = pointCloudFile;
 
     // Warn about file size limits in Codespaces
     const fileSizeMB = file.size / (1024 * 1024);
@@ -86,7 +100,10 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, onFileSelect, selecte
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      // Append all files (point cloud + metadata if present)
+      files.forEach(f => {
+        formData.append('files', f);
+      });
 
       // Send parameters as query string for reliability
       const params = new URLSearchParams({
@@ -123,6 +140,9 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, onFileSelect, selecte
         const ratio = ((response.data.displayedPoints / response.data.totalPoints) * 100).toFixed(1);
         console.log(`⚠️  Only ${ratio}% of points will be displayed`);
         console.log(`Increase "Max Display Points" in settings to show more points`);
+      }
+      if (response.data.hasMetadata) {
+        console.log('✓ Metadata file loaded successfully');
       }
       console.log('===========================\n');
       
@@ -367,14 +387,18 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, onFileSelect, selecte
         <Typography variant="body2" color="text.secondary" gutterBottom>
           or click to browse
         </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="text.secondary" display="block">
           Supported formats: CSV, XYZ, TXT
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+          Tip: Select both .xyz and .txt files together to upload with metadata
         </Typography>
         
         <input
           id="file-input"
           type="file"
           accept=".csv,.xyz,.txt"
+          multiple
           style={{ display: 'none' }}
           onChange={handleInputChange}
         />
@@ -393,6 +417,7 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, onFileSelect, selecte
         <input
           type="file"
           hidden
+          multiple
           accept=".csv,.xyz,.txt"
           onChange={handleInputChange}
           disabled={uploading}

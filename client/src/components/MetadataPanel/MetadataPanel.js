@@ -18,7 +18,8 @@ import {
   Save,
   Undo,
   Delete as ClearIcon,
-  ChevronLeft
+  ChevronLeft,
+  Download
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -176,7 +177,7 @@ function MetadataPanel({ selectedFile, onMetadataChange, expanded, onToggleExpan
   };
 
   /**
-   * Save metadata to server
+   * Save metadata to server and download to local disk
    */
   const handleSaveMetadata = async () => {
     if (!selectedFile) return;
@@ -199,6 +200,9 @@ function MetadataPanel({ selectedFile, onMetadataChange, expanded, onToggleExpan
       
       console.log('Metadata saved successfully for file:', selectedFile.id);
 
+      // Automatically download metadata file to local disk
+      downloadMetadataFile();
+
       // Notify parent component if callback provided
       if (onMetadataChange) {
         onMetadataChange(metadata);
@@ -215,6 +219,48 @@ function MetadataPanel({ selectedFile, onMetadataChange, expanded, onToggleExpan
     } finally {
       setSaving(false);
     }
+  };
+
+  /**
+   * Download metadata as .txt file to local disk
+   */
+  const downloadMetadataFile = () => {
+    if (!selectedFile) return;
+
+    // Convert metadata object to file format
+    const metadataLines = [
+      `# Project: ${metadata.project}`,
+      `# Location: ${metadata.location}`,
+      `# CRS: ${metadata.crs}`,
+      `# Scanner: ${metadata.scanner}`,
+      `# Scan Date: ${metadata.scanDate}`,
+      `# Operator: ${metadata.operator}`,
+      `# Weather: ${metadata.weather}`,
+      `# Accuracy: ${metadata.accuracy}`,
+      `# Software: ${metadata.software}`,
+      `# Notes: ${metadata.notes}`,
+      `# Point Format: ${metadata.pointFormat}`,
+      `# Units: ${metadata.units}`
+    ];
+
+    const content = metadataLines.join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    
+    // Get original filename without extension and add .txt
+    const originalName = selectedFile.name.replace(/\.(xyz|csv|txt)$/i, '');
+    const filename = `${originalName}.txt`;
+    
+    // Create download link and trigger download
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    console.log('Metadata file downloaded:', filename);
   };
 
   /**
@@ -482,6 +528,16 @@ function MetadataPanel({ selectedFile, onMetadataChange, expanded, onToggleExpan
                 Clear
               </Button>
             </Box>
+            
+            <Button
+              variant="outlined"
+              startIcon={<Download />}
+              onClick={downloadMetadataFile}
+              fullWidth
+              sx={{ mt: 1 }}
+            >
+              Download Metadata to Local Disk
+            </Button>
           </Box>
         </>
       )}

@@ -228,7 +228,12 @@ function App() {
         )}
 
         {/* Center Panel - 3D Visualization */}
-        <Box sx={{ flex: 1, position: 'relative' }}>
+        <Box sx={{ 
+          flex: 1, 
+          position: 'relative',
+          minWidth: 0, // Allow flexbox to shrink below content size
+          overflow: 'hidden'
+        }}>
           <CenterPanel 
             points={filteredData}
             statistics={statistics}
@@ -248,12 +253,13 @@ function App() {
           />
         </Box>
 
-        {/* Right Panel - Analysis and Controls */}
+        {/* Right Panel - Analysis and Controls (Always visible) */}
         <Box sx={{ 
           width: 350, 
           flexShrink: 0,
           borderLeft: '1px solid rgba(255, 255, 255, 0.12)',
-          overflowY: 'auto'
+          overflowY: 'auto',
+          bgcolor: 'background.paper'
         }}>
           <RightPanel 
             statistics={statistics}

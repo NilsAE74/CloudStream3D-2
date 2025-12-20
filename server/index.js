@@ -180,14 +180,59 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-// Upload file
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+// Upload file(s) - supports uploading .xyz and .txt files together
+app.post('/api/upload', upload.array('files', 10), async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    const filePath = req.file.path;
+    // Separate point cloud files from metadata files
+    const pointCloudFiles = req.files.filter(f => {
+      const ext = path.extname(f.originalname).toLowerCase();
+      return ext === '.xyz' || ext === '.csv';
+    });
+    
+    const metadataFiles = req.files.filter(f => {
+      const ext = path.extname(f.originalname).toLowerCase();
+      return ext === '.txt';
+    });
+    
+    if (pointCloudFiles.length === 0) {
+      return res.status(400).json({ error: 'No point cloud file (.xyz or .csv) uploaded' });
+    }
+    
+    // Use the first point cloud file
+    const pointCloudFile = pointCloudFiles[0];
+    const filePath = pointCloudFile.path;
+    
+    // Try to find matching metadata file
+    let metadataFile = null;
+    if (metadataFiles.length > 0) {
+      // Match by original filename (without extension)
+      const pointCloudBasename = path.basename(pointCloudFile.originalname, path.extname(pointCloudFile.originalname));
+      metadataFile = metadataFiles.find(f => {
+        const metaBasename = path.basename(f.originalname, path.extname(f.originalname));
+        return metaBasename === pointCloudBasename;
+      });
+      
+      // If no match, use the first metadata file
+      if (!metadataFile && metadataFiles.length > 0) {
+        metadataFile = metadataFiles[0];
+      }
+    }
+    
+    // If metadata file exists, rename it to match the point cloud file
+    if (metadataFile) {
+      const uploadDir = path.join(__dirname, '../uploads');
+      const pointCloudBasename = path.basename(filePath, path.extname(filePath));
+      const newMetadataPath = path.join(uploadDir, pointCloudBasename + '.txt');
+      
+      // Move/rename the metadata file
+      fs.renameSync(metadataFile.path, newMetadataPath);
+      console.log(`[Metadata] Linked metadata file: ${path.basename(newMetadataPath)}`);
+    }
+    
     const points = await parsePointCloudFile(filePath);
     
     if (points.length === 0) {
@@ -207,8 +252,8 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`FILE UPLOAD PROCESSING`);
     console.log(`${'='.repeat(60)}`);
-    console.log(`File: ${req.file.originalname}`);
-    console.log(`File size: ${(req.file.size / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`File: ${pointCloudFile.originalname}`);
+    console.log(`File size: ${(pointCloudFile.size / 1024 / 1024).toFixed(2)} MB`);
     console.log(`Total points parsed: ${points.length.toLocaleString()}`);
     console.log(`\nSettings:`);
     console.log(`  - Downsampling enabled: ${downsamplingEnabled}`);
@@ -254,15 +299,22 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     console.log(`\nMemory estimate for display: ~${memoryEstimate.toFixed(2)} MB`);
     console.log(`${'='.repeat(60)}\n`);
     
+    // Check if metadata was uploaded with the file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const pointCloudBasename = path.basename(filePath, path.extname(filePath));
+    const metadataPath = path.join(uploadDir, pointCloudBasename + '.txt');
+    const hasMetadata = fs.existsSync(metadataPath);
+    
     res.json({
-      filename: req.file.originalname,
+      filename: pointCloudFile.originalname,
       fileId: path.basename(filePath),
       points: displayPoints,
       allPoints: points.length <= MAX_DISPLAY_POINTS ? points : null,
       statistics,
       totalPoints: points.length,
       displayedPoints: displayPoints.length,
-      downsamplingApplied: downsamplingApplied
+      downsamplingApplied: downsamplingApplied,
+      hasMetadata: hasMetadata
     });
   } catch (error) {
     console.error('Upload error:', error);
