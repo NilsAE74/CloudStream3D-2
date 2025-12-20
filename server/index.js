@@ -12,27 +12,17 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware - Configure CORS to allow Codespaces URLs
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow all Codespaces URLs and localhost
-    if (
-      origin.includes('app.github.dev') ||
-      origin.includes('localhost') ||
-      origin.includes('127.0.0.1')
-    ) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+app.use(cors({
+  origin: [
+    'https://cuddly-space-meme-pxp7j49949w36rj-3000.app.github.dev',
+    'http://localhost:3000',
+    /^https:\/\/.*\.app\.github\.dev$/ // Allow all GitHub Codespaces URLs
+  ],
   credentials: true,
-  optionsSuccessStatus: 200
-};
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 
-app.use(cors(corsOptions));
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
@@ -470,6 +460,52 @@ app.post('/api/check-metadata', (req, res) => {
 });
 
 /**
+ * API Endpoint: Check if metadata exists (GET version)
+ * 
+ * Same as POST version but accepts query parameters instead
+ */
+app.get('/api/check-metadata', (req, res) => {
+  try {
+    const { fileId } = req.query;
+    
+    // Validate request
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    // Step 1: Construct path to uploaded file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Step 2: Verify that the original file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Step 3: Determine metadata file path
+    // Get base filename without extension and append .txt
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
+    
+    // Step 4: Use the readMetadata function to check and read metadata
+    // This ensures consistency with the PDF generation logic
+    const metadata = readMetadata(metadataFilePath);
+    const metadataExists = metadata !== null;
+    
+    // Step 5: Return response
+    res.json({
+      exists: metadataExists,
+      metadataFilePath: metadataFilePath,
+      metadata: metadata
+    });
+    
+  } catch (error) {
+    console.error('Check metadata error:', error);
+    res.status(500).json({ error: error.message || 'Error checking metadata' });
+  }
+});
+
+/**
  * API Endpoint: Save metadata to a .txt file
  * 
  * This endpoint creates a new .txt file with the same name as the uploaded
@@ -664,8 +700,17 @@ app.post('/api/generate-report', async (req, res) => {
   }
 });
 
-// Start server
-const server = app.listen(PORT, () => {
+// Global error handlers
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Start server - bind to 0.0.0.0 for Codespaces compatibility
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
 

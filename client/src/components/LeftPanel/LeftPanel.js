@@ -15,11 +15,9 @@ import {
 import {
   CloudUpload,
   Delete,
-  Description,
-  Assessment
+  Description
 } from '@mui/icons-material';
 import axios from 'axios';
-import MetadataDialog from '../MetadataDialog/MetadataDialog';
 
 // Use environment variable or construct from window location in Codespaces
 const getApiUrl = () => {
@@ -43,10 +41,6 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [visibleFiles, setVisibleFiles] = useState(new Set());
-  const [generatingReport, setGeneratingReport] = useState(false);
-  const [selectedFileForReport, setSelectedFileForReport] = useState(null);
-  const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
-  const [currentFileForMetadata, setCurrentFileForMetadata] = useState(null);
   const [latestFileMetadata, setLatestFileMetadata] = useState(null);
   const [loadingMetadata, setLoadingMetadata] = useState(false);
   
@@ -225,93 +219,6 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
   }, []);
   
   /**
-   * Handle PDF report generation button click
-   * 
-   * This function implements the metadata workflow:
-   * 1. Check if a .txt metadata file exists for the uploaded .xyz file
-   * 2. If metadata exists: Proceed directly to PDF generation
-   * 3. If metadata doesn't exist: Show form to collect metadata from user
-   * 
-   * @param {Object} file - The file object for which to generate the report
-   */
-  const handleGenerateReport = useCallback(async (file) => {
-    setSelectedFileForReport(file.id);
-    setError(null);
-    
-    try {
-      console.log('Checking for metadata for file:', file.name, 'ID:', file.id);
-      
-      // Step 1: Check if metadata file exists in the uploads folder
-      const checkResponse = await axios.post(
-        `${API_URL}/api/check-metadata`,
-        { fileId: file.id },
-        { timeout: 30000 }
-      );
-      
-      // Step 2: Branch based on metadata existence
-      if (checkResponse.data.exists) {
-        // Metadata file already exists, proceed directly to report generation
-        console.log('Metadata file exists, generating report...');
-        await generatePDFReport(file);
-      } else {
-        // No metadata file found, show form to collect metadata from user
-        console.log('No metadata file found, showing metadata form...');
-        setCurrentFileForMetadata(file);
-        setMetadataDialogOpen(true);
-      }
-      
-    } catch (err) {
-      console.error('Error checking metadata:', err);
-      setError('Failed to check metadata. Please try again.');
-      setSelectedFileForReport(null);
-    }
-  }, []);
-  
-  /**
-   * Save metadata and generate report
-   * 
-   * This function is called when the user submits the metadata form.
-   * It saves the metadata to a .txt file and then generates the PDF report.
-   * 
-   * @param {Array<string>} metadataLines - Array of metadata lines from the form
-   */
-  const handleSaveMetadata = useCallback(async (metadataLines) => {
-    if (!currentFileForMetadata) return;
-    
-    setGeneratingReport(true);
-    
-    try {
-      console.log('Saving metadata for file:', currentFileForMetadata.name);
-      
-      // Step 1: Save metadata to .txt file
-      // This creates a new file with the same name as the .xyz file but .txt extension
-      await axios.post(
-        `${API_URL}/api/save-metadata`,
-        {
-          fileId: currentFileForMetadata.id,
-          metadata: metadataLines
-        },
-        { timeout: 30000 }
-      );
-      
-      console.log('Metadata saved successfully');
-      
-      // Step 2: Close the metadata dialog
-      setMetadataDialogOpen(false);
-      
-      // Step 3: Generate the PDF report (which will now include the metadata)
-      await generatePDFReport(currentFileForMetadata);
-      
-    } catch (err) {
-      console.error('Error saving metadata:', err);
-      setError('Failed to save metadata. Please try again.');
-    } finally {
-      setGeneratingReport(false);
-      setCurrentFileForMetadata(null);
-    }
-  }, [currentFileForMetadata]);
-  
-  /**
    * Check if metadata exists for a file and load it
    */
   const checkAndLoadMetadata = useCallback(async (fileId) => {
@@ -336,80 +243,6 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       setLatestFileMetadata(null);
     } finally {
       setLoadingMetadata(false);
-    }
-  }, []);
-  
-  /**
-   * Generate PDF report (actual PDF generation)
-   * 
-   * This function calls the backend API to generate a PDF report.
-   * The backend will automatically include metadata if a .txt file exists.
-   * When the PDF is ready, it's automatically downloaded to the user's computer.
-   * 
-   * @param {Object} file - The file object for which to generate the report
-   */
-  const generatePDFReport = useCallback(async (file) => {
-    setGeneratingReport(true);
-    
-    try {
-      console.log('Generating PDF report for file:', file.name, 'ID:', file.id);
-      
-      // Step 1: Call the backend API to generate the PDF
-      // The response will be a binary PDF file (blob)
-      const response = await axios.post(
-        `${API_URL}/api/generate-report`,
-        {
-          fileId: file.id,
-          originalFilename: file.name
-        },
-        {
-          responseType: 'blob', // Important for receiving PDF file
-          timeout: 300000 // 5 minutes timeout
-        }
-      );
-      
-      // Step 2: Create a download link for the PDF
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Step 3: Set the filename for the download
-      const baseFilename = file.name.replace(/\.[^/.]+$/, '');
-      link.download = `pointcloud_${baseFilename}.pdf`;
-      
-      // Step 4: Trigger the download
-      document.body.appendChild(link);
-      link.click();
-      
-      // Step 5: Cleanup
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      console.log('Report generated and downloaded successfully');
-      
-    } catch (err) {
-      console.error('Report generation error:', err);
-      
-      let errorMessage = 'Failed to generate report. Please try again.';
-      
-      if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-        errorMessage = 'Report generation timeout. The file may be too large. Please try a smaller file.';
-      } else if (err.response?.data) {
-        // Try to extract error message from blob response
-        try {
-          const text = await err.response.data.text();
-          const errorData = JSON.parse(text);
-          errorMessage = errorData.error || errorMessage;
-        } catch (e) {
-          // If we can't parse it, use default message
-        }
-      }
-      
-      setError(errorMessage);
-    } finally {
-      setGeneratingReport(false);
-      setSelectedFileForReport(null);
     }
   }, []);
 
@@ -579,45 +412,11 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
                     <Delete />
                   </IconButton>
                 </Box>
-                <Box sx={{ mt: 1, width: '100%' }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    startIcon={
-                      generatingReport && selectedFileForReport === file.id 
-                        ? <CircularProgress size={16} /> 
-                        : <Assessment />
-                    }
-                    disabled={generatingReport}
-                    onClick={() => handleGenerateReport(file)}
-                    sx={{ 
-                      textTransform: 'none',
-                      fontSize: '0.75rem'
-                    }}
-                  >
-                    {generatingReport && selectedFileForReport === file.id
-                      ? 'Generating Report...'
-                      : 'Generate PDF Report'}
-                  </Button>
-                </Box>
               </ListItem>
             ))
           )}
         </List>
       </Paper>
-      
-      {/* Metadata Dialog */}
-      <MetadataDialog
-        open={metadataDialogOpen}
-        onClose={() => {
-          setMetadataDialogOpen(false);
-          setCurrentFileForMetadata(null);
-          setSelectedFileForReport(null);
-        }}
-        onSave={handleSaveMetadata}
-        loading={generatingReport}
-      />
     </Box>
   );
 }
