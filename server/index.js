@@ -7,9 +7,15 @@ const Papa = require('papaparse');
 const { invertZ, shiftData, rotateData } = require('./utils/transformations');
 const { importanceSampling, poissonDiskSampling } = require('./utils/sampling');
 const { generateReport } = require('./utils/generateReport');
+const { parseMetadataToObject, convertObjectToMetadataLines, getDefaultMetadata } = require('./utils/metadataParser');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Regular expression to detect invalid control characters in metadata
+// Allows only printable characters, newlines (\n), and tabs (\t)
+// Blocks all other control characters (0x00-0x08, 0x0B-0x0C, 0x0E-0x1F, 0x7F)
+const INVALID_CONTROL_CHARS_REGEX = /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/;
 
 // Middleware - Configure CORS to allow Codespaces URLs
 const corsOptions = {
@@ -29,7 +35,10 @@ const corsOptions = {
     }
   },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 };
 
 app.use(cors(corsOptions));
@@ -171,14 +180,59 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-// Upload file
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+// Upload file(s) - supports uploading .xyz and .txt files together
+app.post('/api/upload', upload.array('files', 10), async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    const filePath = req.file.path;
+    // Separate point cloud files from metadata files
+    const pointCloudFiles = req.files.filter(f => {
+      const ext = path.extname(f.originalname).toLowerCase();
+      return ext === '.xyz' || ext === '.csv';
+    });
+    
+    const metadataFiles = req.files.filter(f => {
+      const ext = path.extname(f.originalname).toLowerCase();
+      return ext === '.txt';
+    });
+    
+    if (pointCloudFiles.length === 0) {
+      return res.status(400).json({ error: 'No point cloud file (.xyz or .csv) uploaded' });
+    }
+    
+    // Use the first point cloud file
+    const pointCloudFile = pointCloudFiles[0];
+    const filePath = pointCloudFile.path;
+    
+    // Try to find matching metadata file
+    let metadataFile = null;
+    if (metadataFiles.length > 0) {
+      // Match by original filename (without extension)
+      const pointCloudBasename = path.basename(pointCloudFile.originalname, path.extname(pointCloudFile.originalname));
+      metadataFile = metadataFiles.find(f => {
+        const metaBasename = path.basename(f.originalname, path.extname(f.originalname));
+        return metaBasename === pointCloudBasename;
+      });
+      
+      // If no match, use the first metadata file
+      if (!metadataFile && metadataFiles.length > 0) {
+        metadataFile = metadataFiles[0];
+      }
+    }
+    
+    // If metadata file exists, rename it to match the point cloud file
+    if (metadataFile) {
+      const uploadDir = path.join(__dirname, '../uploads');
+      const pointCloudBasename = path.basename(filePath, path.extname(filePath));
+      const newMetadataPath = path.join(uploadDir, pointCloudBasename + '.txt');
+      
+      // Move/rename the metadata file
+      fs.renameSync(metadataFile.path, newMetadataPath);
+      console.log(`[Metadata] Linked metadata file: ${path.basename(newMetadataPath)}`);
+    }
+    
     const points = await parsePointCloudFile(filePath);
     
     if (points.length === 0) {
@@ -198,8 +252,8 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`FILE UPLOAD PROCESSING`);
     console.log(`${'='.repeat(60)}`);
-    console.log(`File: ${req.file.originalname}`);
-    console.log(`File size: ${(req.file.size / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`File: ${pointCloudFile.originalname}`);
+    console.log(`File size: ${(pointCloudFile.size / 1024 / 1024).toFixed(2)} MB`);
     console.log(`Total points parsed: ${points.length.toLocaleString()}`);
     console.log(`\nSettings:`);
     console.log(`  - Downsampling enabled: ${downsamplingEnabled}`);
@@ -245,15 +299,22 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     console.log(`\nMemory estimate for display: ~${memoryEstimate.toFixed(2)} MB`);
     console.log(`${'='.repeat(60)}\n`);
     
+    // Check if metadata was uploaded with the file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const pointCloudBasename = path.basename(filePath, path.extname(filePath));
+    const metadataPath = path.join(uploadDir, pointCloudBasename + '.txt');
+    const hasMetadata = fs.existsSync(metadataPath);
+    
     res.json({
-      filename: req.file.originalname,
+      filename: pointCloudFile.originalname,
       fileId: path.basename(filePath),
       points: displayPoints,
       allPoints: points.length <= MAX_DISPLAY_POINTS ? points : null,
       statistics,
       totalPoints: points.length,
       displayedPoints: displayPoints.length,
-      downsamplingApplied: downsamplingApplied
+      downsamplingApplied: downsamplingApplied,
+      hasMetadata: hasMetadata
     });
   } catch (error) {
     console.error('Upload error:', error);
@@ -491,7 +552,7 @@ app.post('/api/save-metadata', (req, res) => {
       
       // Sanitize: Remove any control characters except newline and tab
       // This prevents potential file system attacks
-      if (/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/.test(line)) {
+      if (INVALID_CONTROL_CHARS_REGEX.test(line)) {
         return res.status(400).json({ 
           error: `Metadata line ${i + 1} contains invalid control characters` 
         });
@@ -529,6 +590,155 @@ app.post('/api/save-metadata', (req, res) => {
   } catch (error) {
     console.error('Save metadata error:', error);
     res.status(500).json({ error: error.message || 'Error saving metadata' });
+  }
+});
+
+/**
+ * API Endpoint: Get metadata for a file (structured object format)
+ * 
+ * This endpoint retrieves metadata for a file and returns it as a structured
+ * object rather than raw lines, making it easier for the frontend to work with.
+ * 
+ * Request params:
+ *   - fileId: The ID of the uploaded file (filename in uploads directory)
+ * 
+ * Response:
+ *   - exists: Boolean indicating if metadata file exists
+ *   - metadata: Structured metadata object with all fields
+ */
+app.get('/api/metadata/:fileId', (req, res) => {
+  try {
+    const { fileId } = req.params;
+    
+    // Validate request
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    // Step 1: Construct path to uploaded file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Step 2: Verify that the original file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Step 3: Determine metadata file path
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
+    
+    // Step 4: Check if metadata file exists
+    const metadataExists = fs.existsSync(metadataFilePath);
+    
+    let metadata;
+    if (metadataExists) {
+      // Step 5: Read and parse metadata
+      try {
+        const content = fs.readFileSync(metadataFilePath, 'utf-8');
+        const lines = content.split('\n').filter(line => line.trim() !== '');
+        metadata = parseMetadataToObject(lines);
+      } catch (error) {
+        console.error('Error reading metadata:', error);
+        metadata = getDefaultMetadata();
+      }
+    } else {
+      // Return default empty metadata
+      metadata = getDefaultMetadata();
+    }
+    
+    // Step 6: Return response
+    res.json({
+      exists: metadataExists,
+      metadata: metadata
+    });
+    
+  } catch (error) {
+    console.error('Get metadata error:', error);
+    res.status(500).json({ error: error.message || 'Error retrieving metadata' });
+  }
+});
+
+/**
+ * API Endpoint: Update metadata for a file
+ * 
+ * This endpoint updates metadata for a file. It accepts a structured metadata
+ * object, converts it to the line-based format, and saves it to the .txt file.
+ * 
+ * Request params:
+ *   - fileId: The ID of the uploaded file (filename in uploads directory)
+ * 
+ * Request body:
+ *   - metadata: Structured metadata object with fields
+ * 
+ * Response:
+ *   - success: Boolean indicating if save was successful
+ *   - message: Success message
+ */
+app.put('/api/metadata/:fileId', (req, res) => {
+  try {
+    const { fileId } = req.params;
+    const { metadata } = req.body;
+    
+    // Validate request
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    if (!metadata || typeof metadata !== 'object') {
+      return res.status(400).json({ error: 'Metadata must be an object' });
+    }
+    
+    // Step 1: Construct path to uploaded file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Step 2: Verify that the original file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Step 3: Convert metadata object to lines format
+    const metadataLines = convertObjectToMetadataLines(metadata);
+    
+    // Step 4: Validate metadata content
+    const MAX_LINE_LENGTH = 500;
+    for (let i = 0; i < metadataLines.length; i++) {
+      const line = metadataLines[i];
+      
+      if (line.length > MAX_LINE_LENGTH) {
+        return res.status(400).json({ 
+          error: `Metadata line ${i + 1} exceeds maximum length of ${MAX_LINE_LENGTH} characters` 
+        });
+      }
+      
+      // Sanitize: Remove any control characters except newline and tab
+      if (/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/.test(line)) {
+        return res.status(400).json({ 
+          error: `Metadata line ${i + 1} contains invalid control characters` 
+        });
+      }
+    }
+    
+    // Step 5: Determine metadata file path
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
+    
+    // Step 6: Write metadata to file
+    const content = metadataLines.join('\n');
+    fs.writeFileSync(metadataFilePath, content, 'utf-8');
+    
+    console.log(`[Metadata] Updated metadata for file: ${fileId}`);
+    
+    // Step 7: Return success response
+    res.json({
+      success: true,
+      message: 'Metadata updated successfully'
+    });
+    
+  } catch (error) {
+    console.error('Update metadata error:', error);
+    res.status(500).json({ error: error.message || 'Error updating metadata' });
   }
 });
 
