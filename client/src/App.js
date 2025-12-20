@@ -3,6 +3,7 @@ import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import LeftPanel from './components/LeftPanel/LeftPanel';
 import CenterPanel from './components/CenterPanel/CenterPanel';
 import RightPanel from './components/RightPanel/RightPanel';
+import MetadataPanel from './components/MetadataPanel/MetadataPanel';
 import './App.css';
 
 // Create Material-UI theme
@@ -137,6 +138,14 @@ function App() {
     setVisibleFiles(files);
   }, []);
 
+  // State for selected file (for metadata panel)
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  // Handle file selection for metadata
+  const handleFileSelect = useCallback((file) => {
+    setSelectedFile(file);
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -155,11 +164,31 @@ function App() {
           <LeftPanel 
             onFileUploaded={handleFileUploaded}
             onVisibleFilesChange={handleVisibleFilesChange}
+            onFileSelect={handleFileSelect}
+            selectedFile={selectedFile}
             maxDisplayPoints={maxDisplayPoints}
             downsamplingEnabled={downsamplingEnabled}
             samplingAlgorithm={samplingAlgorithm}
           />
         </Box>
+
+        {/* Metadata Panel - Attached to right of LeftPanel */}
+        {selectedFile && (
+          <Box sx={{ 
+            width: 350, 
+            flexShrink: 0,
+            borderRight: '1px solid rgba(255, 255, 255, 0.12)',
+            overflowY: 'auto',
+            bgcolor: 'background.paper'
+          }}>
+            <MetadataPanel 
+              selectedFile={selectedFile}
+              onMetadataChange={(metadata) => {
+                console.log('Metadata changed:', metadata);
+              }}
+            />
+          </Box>
+        )}
 
         {/* Center Panel - 3D Visualization */}
         <Box sx={{ flex: 1, position: 'relative' }}>

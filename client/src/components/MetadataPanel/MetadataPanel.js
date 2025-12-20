@@ -280,7 +280,7 @@ function MetadataPanel({ selectedFile, onMetadataChange }) {
   }
 
   return (
-    <Paper sx={{ p: 2, mt: 2 }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 2, overflow: 'auto' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6" sx={{ flex: 1 }}>
           📋 Project Metadata
@@ -498,7 +498,7 @@ function MetadataPanel({ selectedFile, onMetadataChange }) {
           </Button>
         </DialogActions>
       </Dialog>
-    </Paper>
+    </Box>
   );
 }
 

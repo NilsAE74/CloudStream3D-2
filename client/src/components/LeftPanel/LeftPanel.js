@@ -19,7 +19,6 @@ import {
   Assessment
 } from '@mui/icons-material';
 import axios from 'axios';
-import MetadataPanel from '../MetadataPanel/MetadataPanel';
 
 // Use environment variable or construct from window location in Codespaces
 const getApiUrl = () => {
@@ -37,7 +36,7 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
-function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, downsamplingEnabled, samplingAlgorithm }) {
+function LeftPanel({ onFileUploaded, onVisibleFilesChange, onFileSelect, selectedFile, maxDisplayPoints, downsamplingEnabled, samplingAlgorithm }) {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
@@ -45,7 +44,6 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
   const [visibleFiles, setVisibleFiles] = useState(new Set());
   const [generatingReport, setGeneratingReport] = useState(false);
   const [selectedFileForReport, setSelectedFileForReport] = useState(null);
-  const [selectedFile, setSelectedFile] = useState(null); // Track currently selected file for metadata panel
   
   // Notify parent whenever visibleFiles changes
   useEffect(() => {
@@ -138,7 +136,9 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       });
       
       // Automatically select the new file for metadata editing
-      setSelectedFile(newFile);
+      if (onFileSelect) {
+        onFileSelect(newFile);
+      }
 
       // Notify parent component
       if (onFileUploaded) {
@@ -205,9 +205,11 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       return newVisible;
     });
     // Clear selected file if it's the one being removed
-    setSelectedFile(prev => (prev && prev.id === fileId) ? null : prev);
+    if (selectedFile && selectedFile.id === fileId && onFileSelect) {
+      onFileSelect(null);
+    }
     // useEffect will automatically call onVisibleFilesChange
-  }, []);
+  }, [selectedFile, onFileSelect]);
   
   // Toggle file visibility
   const handleToggleVisibility = useCallback((fileId) => {
@@ -225,8 +227,10 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
   
   // Handle file selection for metadata panel
   const handleSelectFile = useCallback((file) => {
-    setSelectedFile(file);
-  }, []);
+    if (onFileSelect) {
+      onFileSelect(file);
+    }
+  }, [onFileSelect]);
   
   /**
    * Handle PDF report generation button click
@@ -506,14 +510,6 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
           )}
         </List>
       </Paper>
-      
-      {/* Metadata Panel - Shows when a file is selected */}
-      <MetadataPanel 
-        selectedFile={selectedFile}
-        onMetadataChange={(metadata) => {
-          console.log('Metadata changed:', metadata);
-        }}
-      />
     </Box>
   );
 }
