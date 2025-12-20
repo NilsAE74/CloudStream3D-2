@@ -533,6 +533,9 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
       const stream = fs.createWriteStream(outputPath);
       doc.pipe(stream);
       
+      // Calculate page width for centered text
+      const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      
       // Title
       doc.fontSize(16)
          .font('Helvetica-Bold')
@@ -556,11 +559,19 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
          .font('Helvetica')
          .text(
            'This report provides a statistical analysis and visualization of the uploaded point cloud data, ' +
-           'including spatial extent, distribution metrics, and 3D visualization with height-based coloring.',
+           'including spatial extent, distribution metrics, and 3D visualization with depth-based coloring.',
            { align: 'left' }
          );
       
       doc.moveDown(0.5);
+      
+      // Define table column variables (used by both metadata and statistics tables)
+      const colWidth = 130;
+      const rowHeight = 20;
+      const col1X = 50;
+      const col2X = col1X + colWidth;
+      const col3X = col2X + colWidth;
+      const col4X = col3X + colWidth;
       
       // ========================================
       // METADATA SECTION
@@ -572,40 +583,117 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
         // Section title
         doc.fontSize(11)
            .font('Helvetica-Bold')
-           .fillColor('#2c3e50')
-           .text('Project Information');
-        
+           .fillColor('#2c3e50');
+        doc.text('Project Information', doc.page.margins.left, doc.y, {
+          width: pageWidth,
+          align: 'center'
+        });
         doc.moveDown(0.3);
         
-        // Display each metadata line in a formatted way
-        doc.fontSize(8)
-           .font('Helvetica')
-           .fillColor('#2c3e50');
-        
-        // Iterate through all metadata lines and add them to the PDF
+        // Parse metadata into key-value pairs and filter out empty values
+        const metadataEntries = [];
         metadata.forEach(line => {
-          doc.text(line, { align: 'left' });
+          // Handle lines like "# Key: Value" or "Key: Value"
+          const cleanLine = line.replace(/^#\s*/, '').trim();
+          const colonIndex = cleanLine.indexOf(':');
+          if (colonIndex > 0) {
+            const key = cleanLine.substring(0, colonIndex).trim();
+            const value = cleanLine.substring(colonIndex + 1).trim();
+            // Only include entries with non-empty values
+            if (value && value.length > 0) {
+              metadataEntries.push({ key, value });
+            }
+          }
         });
         
-        doc.moveDown(0.5);
+        // Only display table if there are non-empty entries
+        if (metadataEntries.length > 0) {
+          // Create metadata table
+          const metadataTableTop = doc.y;
+          const metadataRowHeight = 18;
+          let metadataCurrentY = metadataTableTop;
+          
+          // Helper function to draw metadata table row (2 columns: key-value pairs)
+          function drawMetadataRow(y, key1, value1, key2, value2, isBold = false, bgColor = null) {
+            if (bgColor) {
+              doc.rect(col1X, y, colWidth * 4, metadataRowHeight).fill(bgColor);
+            }
+            
+            const font = isBold ? 'Helvetica-Bold' : 'Helvetica';
+            const fontSize = 8;
+            
+            doc.fontSize(fontSize)
+               .fillColor('#2c3e50');
+            
+            // First column pair
+            if (key1) {
+              doc.font('Helvetica-Bold')
+                 .text(key1, col1X + 5, y + 4, { width: colWidth - 10, continued: false });
+              doc.font(font)
+                 .text(value1, col2X + 5, y + 4, { width: colWidth - 10, continued: false });
+            }
+            
+            // Second column pair
+            if (key2) {
+              doc.font('Helvetica-Bold')
+                 .text(key2, col3X + 5, y + 4, { width: colWidth - 10, continued: false });
+              doc.font(font)
+                 .text(value2, col4X + 5, y + 4, { width: colWidth - 10, continued: false });
+            }
+            
+            // Draw borders
+            doc.strokeColor('#888888')
+               .lineWidth(0.5)
+               .rect(col1X, y, colWidth * 4, metadataRowHeight)
+               .stroke();
+          }
+          
+          // Draw header row
+          drawMetadataRow(metadataCurrentY, 'Field', 'Value', 'Field', 'Value', true, '#3498db');
+          doc.fillColor('white');
+          doc.text('Field', col1X + 5, metadataCurrentY + 4, { width: colWidth - 10 });
+          doc.text('Value', col2X + 5, metadataCurrentY + 4, { width: colWidth - 10 });
+          doc.text('Field', col3X + 5, metadataCurrentY + 4, { width: colWidth - 10 });
+          doc.text('Value', col4X + 5, metadataCurrentY + 4, { width: colWidth - 10 });
+          
+          metadataCurrentY += metadataRowHeight;
+          
+          // Draw data rows (2 entries per row)
+          for (let i = 0; i < metadataEntries.length; i += 2) {
+            const entry1 = metadataEntries[i];
+            const entry2 = metadataEntries[i + 1] || null;
+            
+            const bgColor = Math.floor(i / 2) % 2 === 0 ? '#ecf0f1' : '#ffffff';
+            
+            drawMetadataRow(
+              metadataCurrentY,
+              entry1.key,
+              entry1.value,
+              entry2 ? entry2.key : null,
+              entry2 ? entry2.value : null,
+              false,
+              bgColor
+            );
+            
+            metadataCurrentY += metadataRowHeight;
+          }
+          
+          doc.moveDown(1);
+        }
       }
       
       // Statistics Section
       doc.fontSize(11)
          .font('Helvetica-Bold')
-         .fillColor('#2c3e50')
-         .text('Statistical Summary');
-      
+         .fillColor('#2c3e50');
+      doc.text('Statistical Summary', doc.page.margins.left, doc.y, {
+        width: pageWidth,
+        align: 'center'
+      });
       doc.moveDown(0.3);
       
       // Create statistics table
       const tableTop = doc.y;
-      const colWidth = 130;
-      const rowHeight = 20;
-      const col1X = 50;
-      const col2X = col1X + colWidth;
-      const col3X = col2X + colWidth;
-      const col4X = col3X + colWidth;
       
       // Helper function to draw table row
       function drawTableRow(y, values, isBold = false, bgColor = null) {
@@ -662,8 +750,11 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
       doc.y = currentY + 10;
       doc.fontSize(11)
          .font('Helvetica-Bold')
-         .fillColor('#2c3e50')
-         .text('Visualizations');
+         .fillColor('#2c3e50');
+      doc.text('Visualizations', doc.page.margins.left, doc.y, {
+        width: pageWidth,
+        align: 'center'
+      });
       
       doc.moveDown(0.5);
       
@@ -704,9 +795,11 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
  * @param {string} inputFile - Path to input XYZ file
  * @param {string} outputFile - Path to output PDF file
  * @param {string} originalFilename - Original filename for display in report
+ * @param {string} projectName - Optional project name to include in report
+ * @param {Object} metadataObj - Optional pre-loaded metadata object
  * @returns {Promise<Object>} Result object with success status
  */
-async function generateReport(inputFile, outputFile, originalFilename = null) {
+async function generateReport(inputFile, outputFile, originalFilename = null, projectName = null, metadataObj = null) {
   console.log('\n' + '='.repeat(60));
   console.log('POINT CLOUD ANALYSIS AND REPORT GENERATION (JavaScript)');
   console.log('='.repeat(60));
@@ -728,25 +821,37 @@ async function generateReport(inputFile, outputFile, originalFilename = null) {
     // ========================================
     // METADATA FILE HANDLING
     // ========================================
-    // Step 1: Check for metadata file
-    // The metadata file should have the same name as the input file but with .txt extension
-    // For example, if input is "scan-data.xyz", look for "scan-data.txt"
+    let metadata = metadataObj;
     
-    // Get the directory where the input file is located
-    const inputDir = path.dirname(inputFile);
+    // If metadata not provided, try to read from file
+    if (!metadata) {
+      // Step 1: Check for metadata file
+      // The metadata file should have the same name as the input file but with .txt extension
+      // For example, if input is "scan-data.xyz", look for "scan-data.txt"
+      
+      // Get the directory where the input file is located
+      const inputDir = path.dirname(inputFile);
+      
+      // Get the base filename without extension (e.g., "scan-data.xyz" -> "scan-data")
+      const inputBasename = path.basename(inputFile, path.extname(inputFile));
+      
+      // Construct the full path to the metadata file
+      const metadataFilePath = path.join(inputDir, inputBasename + '.txt');
+      
+      console.log(`[Metadata] Checking for metadata file: ${metadataFilePath}`);
+      
+      // Step 2: Read metadata if the file exists
+      // If the file doesn't exist, readMetadata() will return null and the report
+      // will be generated without the Project Information section
+      metadata = readMetadata(metadataFilePath);
+    } else {
+      console.log('[Metadata] Using pre-loaded metadata object');
+    }
     
-    // Get the base filename without extension (e.g., "scan-data.xyz" -> "scan-data")
-    const inputBasename = path.basename(inputFile, path.extname(inputFile));
-    
-    // Construct the full path to the metadata file
-    const metadataFilePath = path.join(inputDir, inputBasename + '.txt');
-    
-    console.log(`[Metadata] Checking for metadata file: ${metadataFilePath}`);
-    
-    // Step 2: Read metadata if the file exists
-    // If the file doesn't exist, readMetadata() will return null and the report
-    // will be generated without the Project Information section
-    const metadata = readMetadata(metadataFilePath);
+    // Add project name to metadata if provided
+    if (projectName && metadata) {
+      metadata.Project = projectName;
+    }
     
     // Step 3: Generate PDF report with or without metadata
     const displayFilename = originalFilename || path.basename(inputFile);
