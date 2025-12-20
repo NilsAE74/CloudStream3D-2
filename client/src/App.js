@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { Box, CssBaseline, ThemeProvider, createTheme, Button } from '@mui/material';
 import LeftPanel from './components/LeftPanel/LeftPanel';
 import CenterPanel from './components/CenterPanel/CenterPanel';
 import RightPanel from './components/RightPanel/RightPanel';
@@ -140,6 +140,9 @@ function App() {
 
   // State for selected file (for metadata panel)
   const [selectedFile, setSelectedFile] = useState(null);
+  
+  // State for metadata panel expansion (default collapsed)
+  const [metadataPanelExpanded, setMetadataPanelExpanded] = useState(false);
 
   // Handle file selection for metadata
   const handleFileSelect = useCallback((file) => {
@@ -172,8 +175,8 @@ function App() {
           />
         </Box>
 
-        {/* Metadata Panel - Attached to right of LeftPanel */}
-        {selectedFile && (
+        {/* Metadata Panel - Attached to right of LeftPanel (collapsible) */}
+        {selectedFile && metadataPanelExpanded && (
           <Box sx={{ 
             width: 350, 
             flexShrink: 0,
@@ -183,10 +186,44 @@ function App() {
           }}>
             <MetadataPanel 
               selectedFile={selectedFile}
+              expanded={metadataPanelExpanded}
+              onToggleExpanded={() => setMetadataPanelExpanded(!metadataPanelExpanded)}
               onMetadataChange={(metadata) => {
                 console.log('Metadata changed:', metadata);
               }}
             />
+          </Box>
+        )}
+        
+        {/* Metadata Panel Toggle Button (when collapsed) */}
+        {selectedFile && !metadataPanelExpanded && (
+          <Box sx={{ 
+            width: 48,
+            flexShrink: 0,
+            borderRight: '1px solid rgba(255, 255, 255, 0.12)',
+            bgcolor: 'background.paper',
+            display: 'flex',
+            alignItems: 'flex-start',
+            pt: 2
+          }}>
+            <Button
+              onClick={() => setMetadataPanelExpanded(true)}
+              sx={{
+                minWidth: 48,
+                width: 48,
+                height: 48,
+                p: 0,
+                writingMode: 'vertical-rl',
+                textOrientation: 'mixed',
+                fontSize: '0.75rem',
+                color: 'text.secondary',
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.08)'
+                }
+              }}
+            >
+              📋 Metadata
+            </Button>
           </Box>
         )}
 

@@ -11,12 +11,14 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  IconButton
 } from '@mui/material';
 import {
   Save,
   Undo,
-  Delete as ClearIcon
+  Delete as ClearIcon,
+  ChevronLeft
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -53,8 +55,9 @@ const API_URL = getApiUrl();
  * - Unsaved changes indicator
  * - Revert changes functionality
  * - Clear all metadata
+ * - Collapsible panel
  */
-function MetadataPanel({ selectedFile, onMetadataChange }) {
+function MetadataPanel({ selectedFile, onMetadataChange, expanded, onToggleExpanded }) {
   const [metadata, setMetadata] = useState({
     project: '',
     location: '',
@@ -290,11 +293,22 @@ function MetadataPanel({ selectedFile, onMetadataChange }) {
             variant="caption" 
             sx={{ 
               color: 'warning.main',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              mr: 1
             }}
           >
             • Unsaved changes
           </Typography>
+        )}
+        {onToggleExpanded && (
+          <IconButton 
+            size="small" 
+            onClick={onToggleExpanded}
+            sx={{ ml: 1 }}
+            title="Collapse metadata panel"
+          >
+            <ChevronLeft />
+          </IconButton>
         )}
       </Box>
 
