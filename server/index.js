@@ -7,6 +7,7 @@ const Papa = require('papaparse');
 const { invertZ, shiftData, rotateData } = require('./utils/transformations');
 const { importanceSampling, poissonDiskSampling } = require('./utils/sampling');
 const { generateReport } = require('./utils/generateReport');
+const { parseMetadataToObject, convertObjectToMetadataLines, getDefaultMetadata } = require('./utils/metadataParser');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -529,6 +530,155 @@ app.post('/api/save-metadata', (req, res) => {
   } catch (error) {
     console.error('Save metadata error:', error);
     res.status(500).json({ error: error.message || 'Error saving metadata' });
+  }
+});
+
+/**
+ * API Endpoint: Get metadata for a file (structured object format)
+ * 
+ * This endpoint retrieves metadata for a file and returns it as a structured
+ * object rather than raw lines, making it easier for the frontend to work with.
+ * 
+ * Request params:
+ *   - fileId: The ID of the uploaded file (filename in uploads directory)
+ * 
+ * Response:
+ *   - exists: Boolean indicating if metadata file exists
+ *   - metadata: Structured metadata object with all fields
+ */
+app.get('/api/metadata/:fileId', (req, res) => {
+  try {
+    const { fileId } = req.params;
+    
+    // Validate request
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    // Step 1: Construct path to uploaded file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Step 2: Verify that the original file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Step 3: Determine metadata file path
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
+    
+    // Step 4: Check if metadata file exists
+    const metadataExists = fs.existsSync(metadataFilePath);
+    
+    let metadata;
+    if (metadataExists) {
+      // Step 5: Read and parse metadata
+      try {
+        const content = fs.readFileSync(metadataFilePath, 'utf-8');
+        const lines = content.split('\n').filter(line => line.trim() !== '');
+        metadata = parseMetadataToObject(lines);
+      } catch (error) {
+        console.error('Error reading metadata:', error);
+        metadata = getDefaultMetadata();
+      }
+    } else {
+      // Return default empty metadata
+      metadata = getDefaultMetadata();
+    }
+    
+    // Step 6: Return response
+    res.json({
+      exists: metadataExists,
+      metadata: metadata
+    });
+    
+  } catch (error) {
+    console.error('Get metadata error:', error);
+    res.status(500).json({ error: error.message || 'Error retrieving metadata' });
+  }
+});
+
+/**
+ * API Endpoint: Update metadata for a file
+ * 
+ * This endpoint updates metadata for a file. It accepts a structured metadata
+ * object, converts it to the line-based format, and saves it to the .txt file.
+ * 
+ * Request params:
+ *   - fileId: The ID of the uploaded file (filename in uploads directory)
+ * 
+ * Request body:
+ *   - metadata: Structured metadata object with fields
+ * 
+ * Response:
+ *   - success: Boolean indicating if save was successful
+ *   - message: Success message
+ */
+app.put('/api/metadata/:fileId', (req, res) => {
+  try {
+    const { fileId } = req.params;
+    const { metadata } = req.body;
+    
+    // Validate request
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+    
+    if (!metadata || typeof metadata !== 'object') {
+      return res.status(400).json({ error: 'Metadata must be an object' });
+    }
+    
+    // Step 1: Construct path to uploaded file
+    const uploadDir = path.join(__dirname, '../uploads');
+    const inputFile = path.join(uploadDir, fileId);
+    
+    // Step 2: Verify that the original file exists
+    if (!fs.existsSync(inputFile)) {
+      return res.status(404).json({ error: 'Input file not found' });
+    }
+    
+    // Step 3: Convert metadata object to lines format
+    const metadataLines = convertObjectToMetadataLines(metadata);
+    
+    // Step 4: Validate metadata content
+    const MAX_LINE_LENGTH = 500;
+    for (let i = 0; i < metadataLines.length; i++) {
+      const line = metadataLines[i];
+      
+      if (line.length > MAX_LINE_LENGTH) {
+        return res.status(400).json({ 
+          error: `Metadata line ${i + 1} exceeds maximum length of ${MAX_LINE_LENGTH} characters` 
+        });
+      }
+      
+      // Sanitize: Remove any control characters except newline and tab
+      if (/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/.test(line)) {
+        return res.status(400).json({ 
+          error: `Metadata line ${i + 1} contains invalid control characters` 
+        });
+      }
+    }
+    
+    // Step 5: Determine metadata file path
+    const inputBasename = path.basename(inputFile, path.extname(inputFile));
+    const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
+    
+    // Step 6: Write metadata to file
+    const content = metadataLines.join('\n');
+    fs.writeFileSync(metadataFilePath, content, 'utf-8');
+    
+    console.log(`[Metadata] Updated metadata for file: ${fileId}`);
+    
+    // Step 7: Return success response
+    res.json({
+      success: true,
+      message: 'Metadata updated successfully'
+    });
+    
+  } catch (error) {
+    console.error('Update metadata error:', error);
+    res.status(500).json({ error: error.message || 'Error updating metadata' });
   }
 });
 

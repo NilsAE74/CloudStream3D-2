@@ -19,7 +19,7 @@ import {
   Assessment
 } from '@mui/icons-material';
 import axios from 'axios';
-import MetadataDialog from '../MetadataDialog/MetadataDialog';
+import MetadataPanel from '../MetadataPanel/MetadataPanel';
 
 // Use environment variable or construct from window location in Codespaces
 const getApiUrl = () => {
@@ -45,8 +45,7 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
   const [visibleFiles, setVisibleFiles] = useState(new Set());
   const [generatingReport, setGeneratingReport] = useState(false);
   const [selectedFileForReport, setSelectedFileForReport] = useState(null);
-  const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
-  const [currentFileForMetadata, setCurrentFileForMetadata] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null); // Track currently selected file for metadata panel
   
   // Notify parent whenever visibleFiles changes
   useEffect(() => {
@@ -137,6 +136,9 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
         newVisible.add(response.data.fileId);
         return newVisible;
       });
+      
+      // Automatically select the new file for metadata editing
+      setSelectedFile(newFile);
 
       // Notify parent component
       if (onFileUploaded) {
@@ -202,6 +204,8 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       newVisible.delete(fileId);
       return newVisible;
     });
+    // Clear selected file if it's the one being removed
+    setSelectedFile(prev => (prev && prev.id === fileId) ? null : prev);
     // useEffect will automatically call onVisibleFilesChange
   }, []);
   
@@ -219,13 +223,17 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     // useEffect will automatically call onVisibleFilesChange
   }, []);
   
+  // Handle file selection for metadata panel
+  const handleSelectFile = useCallback((file) => {
+    setSelectedFile(file);
+  }, []);
+  
   /**
    * Handle PDF report generation button click
    * 
-   * This function implements the metadata workflow:
-   * 1. Check if a .txt metadata file exists for the uploaded .xyz file
-   * 2. If metadata exists: Proceed directly to PDF generation
-   * 3. If metadata doesn't exist: Show form to collect metadata from user
+   * Updated workflow: No longer shows metadata dialog.
+   * The metadata is already available in the MetadataPanel, so we just generate the report directly.
+   * The backend will automatically include the metadata if a .txt file exists.
    * 
    * @param {Object} file - The file object for which to generate the report
    */
@@ -234,77 +242,18 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
     setError(null);
     
     try {
-      console.log('Checking for metadata for file:', file.name, 'ID:', file.id);
+      console.log('Generating PDF report for file:', file.name, 'ID:', file.id);
       
-      // Step 1: Check if metadata file exists in the uploads folder
-      const checkResponse = await axios.post(
-        `${API_URL}/api/check-metadata`,
-        { fileId: file.id },
-        { timeout: 30000 }
-      );
-      
-      // Step 2: Branch based on metadata existence
-      if (checkResponse.data.exists) {
-        // Metadata file already exists, proceed directly to report generation
-        console.log('Metadata file exists, generating report...');
-        await generatePDFReport(file);
-      } else {
-        // No metadata file found, show form to collect metadata from user
-        console.log('No metadata file found, showing metadata form...');
-        setCurrentFileForMetadata(file);
-        setMetadataDialogOpen(true);
-      }
+      // Generate the PDF report directly
+      // The backend will automatically include metadata if a .txt file exists
+      await generatePDFReport(file);
       
     } catch (err) {
-      console.error('Error checking metadata:', err);
-      setError('Failed to check metadata. Please try again.');
+      console.error('Error generating report:', err);
+      setError('Failed to generate report. Please try again.');
       setSelectedFileForReport(null);
     }
   }, []);
-  
-  /**
-   * Save metadata and generate report
-   * 
-   * This function is called when the user submits the metadata form.
-   * It saves the metadata to a .txt file and then generates the PDF report.
-   * 
-   * @param {Array<string>} metadataLines - Array of metadata lines from the form
-   */
-  const handleSaveMetadata = useCallback(async (metadataLines) => {
-    if (!currentFileForMetadata) return;
-    
-    setGeneratingReport(true);
-    
-    try {
-      console.log('Saving metadata for file:', currentFileForMetadata.name);
-      
-      // Step 1: Save metadata to .txt file
-      // This creates a new file with the same name as the .xyz file but .txt extension
-      await axios.post(
-        `${API_URL}/api/save-metadata`,
-        {
-          fileId: currentFileForMetadata.id,
-          metadata: metadataLines
-        },
-        { timeout: 30000 }
-      );
-      
-      console.log('Metadata saved successfully');
-      
-      // Step 2: Close the metadata dialog
-      setMetadataDialogOpen(false);
-      
-      // Step 3: Generate the PDF report (which will now include the metadata)
-      await generatePDFReport(currentFileForMetadata);
-      
-    } catch (err) {
-      console.error('Error saving metadata:', err);
-      setError('Failed to save metadata. Please try again.');
-    } finally {
-      setGeneratingReport(false);
-      setCurrentFileForMetadata(null);
-    }
-  }, [currentFileForMetadata]);
   
   /**
    * Generate PDF report (actual PDF generation)
@@ -486,13 +435,24 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
                 sx={{ 
                   flexDirection: 'column',
                   alignItems: 'stretch',
-                  py: 1.5
+                  py: 1.5,
+                  bgcolor: selectedFile?.id === file.id ? 'rgba(33, 150, 243, 0.1)' : 'transparent',
+                  borderLeft: selectedFile?.id === file.id ? '3px solid #2196f3' : '3px solid transparent',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    bgcolor: 'rgba(33, 150, 243, 0.05)'
+                  }
                 }}
+                onClick={() => handleSelectFile(file)}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                   <Checkbox
                     checked={visibleFiles.has(file.id)}
-                    onChange={() => handleToggleVisibility(file.id)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleToggleVisibility(file.id);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                     sx={{ mr: 1 }}
                   />
                   <Description sx={{ mr: 2 }} />
@@ -508,7 +468,10 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
                   <IconButton 
                     edge="end" 
                     aria-label="delete"
-                    onClick={() => handleRemoveFile(file.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveFile(file.id);
+                    }}
                   >
                     <Delete />
                   </IconButton>
@@ -524,7 +487,10 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
                         : <Assessment />
                     }
                     disabled={generatingReport}
-                    onClick={() => handleGenerateReport(file)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleGenerateReport(file);
+                    }}
                     sx={{ 
                       textTransform: 'none',
                       fontSize: '0.75rem'
@@ -541,16 +507,12 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
         </List>
       </Paper>
       
-      {/* Metadata Dialog */}
-      <MetadataDialog
-        open={metadataDialogOpen}
-        onClose={() => {
-          setMetadataDialogOpen(false);
-          setCurrentFileForMetadata(null);
-          setSelectedFileForReport(null);
+      {/* Metadata Panel - Shows when a file is selected */}
+      <MetadataPanel 
+        selectedFile={selectedFile}
+        onMetadataChange={(metadata) => {
+          console.log('Metadata changed:', metadata);
         }}
-        onSave={handleSaveMetadata}
-        loading={generatingReport}
       />
     </Box>
   );
