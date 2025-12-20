@@ -12,6 +12,11 @@ const { parseMetadataToObject, convertObjectToMetadataLines, getDefaultMetadata 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Regular expression to detect invalid control characters in metadata
+// Allows only printable characters, newlines (\n), and tabs (\t)
+// Blocks all other control characters (0x00-0x08, 0x0B-0x0C, 0x0E-0x1F, 0x7F)
+const INVALID_CONTROL_CHARS_REGEX = /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/;
+
 // Middleware - Configure CORS to allow Codespaces URLs
 const corsOptions = {
   origin: function (origin, callback) {
@@ -492,7 +497,7 @@ app.post('/api/save-metadata', (req, res) => {
       
       // Sanitize: Remove any control characters except newline and tab
       // This prevents potential file system attacks
-      if (/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/.test(line)) {
+      if (INVALID_CONTROL_CHARS_REGEX.test(line)) {
         return res.status(400).json({ 
           error: `Metadata line ${i + 1} contains invalid control characters` 
         });

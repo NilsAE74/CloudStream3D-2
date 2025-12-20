@@ -7,7 +7,11 @@ import {
   Button,
   CircularProgress,
   Alert,
-  Divider
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   Save,
@@ -15,6 +19,10 @@ import {
   Delete as ClearIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+
+// Default CRS commonly used in Germany for UTM Zone 32N
+// This should match the server-side default
+const DEFAULT_CRS = 'EPSG:25832 (UTM Zone 32N)';
 
 // Use environment variable or construct from window location in Codespaces
 const getApiUrl = () => {
@@ -69,6 +77,7 @@ function MetadataPanel({ selectedFile, onMetadataChange }) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   // Load metadata when selectedFile changes
   useEffect(() => {
@@ -133,7 +142,7 @@ function MetadataPanel({ selectedFile, onMetadataChange }) {
     const defaultMeta = {
       project: '',
       location: '',
-      crs: 'EPSG:25832 (UTM Zone 32N)',
+      crs: DEFAULT_CRS,
       scanner: '',
       scanDate: '',
       operator: '',
@@ -221,23 +230,29 @@ function MetadataPanel({ selectedFile, onMetadataChange }) {
    * Clear all metadata fields
    */
   const handleClearAll = () => {
-    if (window.confirm('Are you sure you want to clear all metadata fields? This will not delete saved metadata until you click Save.')) {
-      setMetadata({
-        project: '',
-        location: '',
-        crs: '',
-        scanner: '',
-        scanDate: '',
-        operator: '',
-        weather: '',
-        accuracy: '',
-        software: '',
-        notes: '',
-        pointFormat: '',
-        units: ''
-      });
-      setSaveSuccess(false);
-    }
+    setClearConfirmOpen(true);
+  };
+
+  /**
+   * Confirm clearing all metadata fields
+   */
+  const confirmClearAll = () => {
+    setMetadata({
+      project: '',
+      location: '',
+      crs: '',
+      scanner: '',
+      scanDate: '',
+      operator: '',
+      weather: '',
+      accuracy: '',
+      software: '',
+      notes: '',
+      pointFormat: '',
+      units: ''
+    });
+    setSaveSuccess(false);
+    setClearConfirmOpen(false);
   };
 
   /**
@@ -456,6 +471,33 @@ function MetadataPanel({ selectedFile, onMetadataChange }) {
           </Box>
         </>
       )}
+      
+      {/* Clear Confirmation Dialog */}
+      <Dialog
+        open={clearConfirmOpen}
+        onClose={() => setClearConfirmOpen(false)}
+        PaperProps={{
+          sx: {
+            bgcolor: '#1e1e1e',
+            color: '#fff'
+          }
+        }}
+      >
+        <DialogTitle>Clear All Metadata?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to clear all metadata fields? This will not delete saved metadata until you click Save.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClearConfirmOpen(false)} sx={{ color: '#aaa' }}>
+            Cancel
+          </Button>
+          <Button onClick={confirmClearAll} variant="contained" color="error">
+            Clear All
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }

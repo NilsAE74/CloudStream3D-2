@@ -9,6 +9,10 @@
  * compatibility with the existing file-based metadata storage format.
  */
 
+// Default CRS commonly used in Germany for UTM Zone 32N
+// This can be customized based on your project's geographic location
+const DEFAULT_CRS = 'EPSG:25832 (UTM Zone 32N)';
+
 /**
  * Parse metadata lines into a structured object
  * 
@@ -143,7 +147,7 @@ function getDefaultMetadata() {
   return {
     project: '',
     location: '',
-    crs: 'EPSG:25832 (UTM Zone 32N)',
+    crs: DEFAULT_CRS,
     scanner: '',
     scanDate: '',
     operator: '',
@@ -159,5 +163,6 @@ function getDefaultMetadata() {
 module.exports = {
   parseMetadataToObject,
   convertObjectToMetadataLines,
-  getDefaultMetadata
+  getDefaultMetadata,
+  DEFAULT_CRS
 };
