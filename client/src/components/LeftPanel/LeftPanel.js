@@ -302,12 +302,14 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       // Step 3: Generate the PDF report (which will now include the metadata)
       await generatePDFReport(currentFileForMetadata);
       
+      // Step 4: Clear the current file for metadata after successful report generation
+      setCurrentFileForMetadata(null);
+      
     } catch (err) {
       console.error('Error saving metadata:', err);
       setError('Failed to save metadata. Please try again.');
     } finally {
       setGeneratingReport(false);
-      setCurrentFileForMetadata(null);
     }
   }, [currentFileForMetadata]);
   
@@ -392,7 +394,7 @@ function LeftPanel({ onFileUploaded, onVisibleFilesChange, maxDisplayPoints, dow
       console.error('Report generation error:', err);
       
       let errorMessage = 'Failed to generate report. Please try again.';
-      
+        errorMessage = 'Report generation timeout after 5 minutes. The file may be too large. Please try a smaller file.';
       if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
         errorMessage = 'Report generation timeout. The file may be too large. Please try a smaller file.';
       } else if (err.response?.data) {

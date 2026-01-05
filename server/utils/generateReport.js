@@ -584,7 +584,17 @@ async function generatePDFReport(points, stats, avgNNDistance, histogramBuffer, 
         
         // Iterate through all metadata lines and add them to the PDF
         metadata.forEach(line => {
-          doc.text(line, { align: 'left' });
+          // Sanitize metadata line: ensure string, remove control chars, trim, and limit length
+          const safeLine = String(line)
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+            .trim()
+            .slice(0, 500);
+
+          if (!safeLine) {
+            return;
+          }
+
+          doc.text(safeLine, { align: 'left' });
         });
         
         doc.moveDown(0.5);
