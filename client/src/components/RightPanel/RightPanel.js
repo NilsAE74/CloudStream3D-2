@@ -15,7 +15,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  CircularProgress
 } from '@mui/material';
 import {
   ExpandMore,
@@ -23,8 +24,10 @@ import {
   Transform,
   FilterAlt,
   Assessment,
-  Straighten
+  Straighten,
+  PictureAsPdf
 } from '@mui/icons-material';
+import MetadataDialog from '../MetadataDialog/MetadataDialog';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -117,6 +120,13 @@ function RightPanel({
   // Debounced slider state
   const [sliderValue, setSliderValue] = useState(maxDisplayPoints);
   const debounceTimerRef = useRef(null);
+  
+  // PDF report generation state
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [selectedFileForReport, setSelectedFileForReport] = useState(null);
+  const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
+  const [currentFileForMetadata, setCurrentFileForMetadata] = useState(null);
+  const [reportError, setReportError] = useState(null);
 
   // Track previous statistics to detect file changes
   const prevStatisticsRef = useRef(null);
@@ -369,6 +379,131 @@ function RightPanel({
       console.error('Export error:', error);
     }
   }, [points]);
+  
+  /**
+   * Handle PDF report generation button click
+   */
+  const handleGenerateReport = useCallback(async (file) => {
+    setSelectedFileForReport(file.id);
+    setReportError(null);
+    
+    try {
+      console.log('Checking for metadata for file:', file.name, 'ID:', file.id);
+      
+      const checkResponse = await axios.post(
+        `${API_URL}/api/check-metadata`,
+        { fileId: file.id },
+        { timeout: 30000 }
+      );
+      
+      if (checkResponse.data.exists) {
+        console.log('Metadata file exists, generating report...');
+        await generatePDFReport(file);
+      } else {
+        console.log('No metadata file found, showing metadata form...');
+        setCurrentFileForMetadata(file);
+        setMetadataDialogOpen(true);
+      }
+      
+    } catch (err) {
+      console.error('Error checking metadata:', err);
+      setReportError('Failed to check metadata. Please try again.');
+      setSelectedFileForReport(null);
+    }
+  }, []);
+  
+  /**
+   * Save metadata and generate report
+   */
+  const handleSaveMetadata = useCallback(async (metadataLines) => {
+    if (!currentFileForMetadata) return;
+    
+    setGeneratingReport(true);
+    
+    try {
+      console.log('Saving metadata for file:', currentFileForMetadata.name);
+      
+      await axios.post(
+        `${API_URL}/api/save-metadata`,
+        {
+          fileId: currentFileForMetadata.id,
+          metadata: metadataLines
+        },
+        { timeout: 30000 }
+      );
+      
+      console.log('Metadata saved successfully');
+      setMetadataDialogOpen(false);
+      await generatePDFReport(currentFileForMetadata);
+      
+    } catch (err) {
+      console.error('Error saving metadata:', err);
+      setReportError('Failed to save metadata. Please try again.');
+    } finally {
+      setGeneratingReport(false);
+      setCurrentFileForMetadata(null);
+    }
+  }, [currentFileForMetadata]);
+  
+  /**
+   * Generate PDF report
+   */
+  const generatePDFReport = useCallback(async (file) => {
+    setGeneratingReport(true);
+    
+    try {
+      console.log('Generating PDF report for file:', file.name, 'ID:', file.id);
+      
+      const response = await axios.post(
+        `${API_URL}/api/generate-report`,
+        {
+          fileId: file.id,
+          originalFilename: file.name
+        },
+        {
+          responseType: 'blob',
+          timeout: 300000
+        }
+      );
+      
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const baseFilename = file.name.replace(/\.[^/.]+$/, '');
+      link.download = `pointcloud_${baseFilename}.pdf`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('Report generated and downloaded successfully');
+      
+    } catch (err) {
+      console.error('Report generation error:', err);
+      
+      let errorMessage = 'Failed to generate report. Please try again.';
+      
+      if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+        errorMessage = 'Report generation timeout. The file may be too large.';
+      } else if (err.response?.data) {
+        try {
+          const text = await err.response.data.text();
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // Use default message
+        }
+      }
+      
+      setReportError(errorMessage);
+    } finally {
+      setGeneratingReport(false);
+      setSelectedFileForReport(null);
+    }
+  }, []);
 
   // Calculate measurement distance
   const measurementDistance = useMemo(() => {
@@ -881,7 +1016,7 @@ function RightPanel({
       )}
 
       {/* Export Section */}
-      {points && points.length > 0 && (
+      {(points && points.length > 0) || (visibleFiles && visibleFiles.length > 0) ? (
         <Accordion 
           expanded={expandedPanels.export}
           onChange={handleAccordionChange('export')}
@@ -892,29 +1027,86 @@ function RightPanel({
           </AccordionSummary>
           <AccordionDetails>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap:  1 }}>
-              <Button
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={() => handleExport('csv')}
-                fullWidth
-              >
-                Export as CSV
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={() => handleExport('xyz')}
-                fullWidth
-              >
-                Export as XYZ
-              </Button>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                Exports currently filtered data ({points.length. toLocaleString()} points)
-              </Typography>
+              {points && points.length > 0 && (
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Download />}
+                    onClick={() => handleExport('csv')}
+                    fullWidth
+                  >
+                    Export as CSV
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Download />}
+                    onClick={() => handleExport('xyz')}
+                    fullWidth
+                  >
+                    Export as XYZ
+                  </Button>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, mb: 1 }}>
+                    Exports currently filtered data ({points.length.toLocaleString()} points)
+                  </Typography>
+                  <Divider sx={{ my: 1 }} />
+                </>
+              )}
+              
+              {/* PDF Report Generation */}
+              {visibleFiles && visibleFiles.length > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Generate PDF Reports
+                  </Typography>
+                  {visibleFiles.map((file) => (
+                    <Button
+                      key={file.id}
+                      variant="contained"
+                      size="small"
+                      fullWidth
+                      startIcon={
+                        generatingReport && selectedFileForReport === file.id 
+                          ? <CircularProgress size={16} color="inherit" /> 
+                          : <PictureAsPdf />
+                      }
+                      disabled={generatingReport}
+                      onClick={() => handleGenerateReport(file)}
+                      sx={{ 
+                        textTransform: 'none',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      {generatingReport && selectedFileForReport === file.id
+                        ? 'Generating...'
+                        : `PDF: ${file.name}`}
+                    </Button>
+                  ))}
+                  {reportError && (
+                    <Alert severity="error" sx={{ mt: 1 }}>
+                      {reportError}
+                    </Alert>
+                  )}
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                    Generates detailed PDF report with statistics and metadata
+                  </Typography>
+                </Box>
+              )}
             </Box>
           </AccordionDetails>
         </Accordion>
-      )}
+      ) : null}
+      
+      {/* Metadata Dialog */}
+      <MetadataDialog
+        open={metadataDialogOpen}
+        onClose={() => {
+          setMetadataDialogOpen(false);
+          setCurrentFileForMetadata(null);
+          setSelectedFileForReport(null);
+        }}
+        onSave={handleSaveMetadata}
+        loading={generatingReport}
+      />
     </Box>
   );
 }

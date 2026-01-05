@@ -6,7 +6,7 @@ const fs = require('fs');
 const Papa = require('papaparse');
 const { invertZ, shiftData, rotateData } = require('./utils/transformations');
 const { importanceSampling, poissonDiskSampling } = require('./utils/sampling');
-const { generateReport } = require('./utils/generateReport');
+const { generateReport, readMetadata } = require('./utils/generateReport');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,7 +25,7 @@ const corsOptions = {
     ) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
   credentials: true,
@@ -35,6 +35,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: true, limit: '500mb' }));
+
+// Store session info to link metadata files with their corresponding data files
+const uploadSessions = new Map();
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -46,8 +49,29 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    // Check if this is a metadata file being uploaded with a data file
+    const sessionId = req.headers['x-upload-session'];
+    
+    if (sessionId && uploadSessions.has(sessionId)) {
+      // Use the same basename as the previously uploaded file
+      const baseFilename = uploadSessions.get(sessionId);
+      const newFilename = baseFilename + path.extname(file.originalname);
+      cb(null, newFilename);
+    } else {
+      // Generate new unique filename
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const baseFilename = file.fieldname + '-' + uniqueSuffix;
+      const newFilename = baseFilename + path.extname(file.originalname);
+      
+      // Store this basename for potential metadata file upload
+      if (sessionId) {
+        uploadSessions.set(sessionId, baseFilename);
+        // Clean up after 5 minutes
+        setTimeout(() => uploadSessions.delete(sessionId), 5 * 60 * 1000);
+      }
+      
+      cb(null, newFilename);
+    }
   }
 });
 
@@ -171,14 +195,32 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-// Upload file
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+// Upload file (supports optional metadata file)
+app.post('/api/upload', upload.fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'metadata', maxCount: 1 }
+]), async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.files || !req.files.file || !req.files.file[0]) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    const filePath = req.file.path;
+    const mainFile = req.files.file[0];
+    const filePath = mainFile.path;
+    
+    // Handle metadata file if provided
+    if (req.files.metadata && req.files.metadata[0]) {
+      const metadataFile = req.files.metadata[0];
+      const mainBasename = path.basename(filePath, path.extname(filePath));
+      const targetMetadataPath = path.join(path.dirname(filePath), mainBasename + '.txt');
+      
+      // Rename metadata file to match the main file basename
+      if (metadataFile.path !== targetMetadataPath) {
+        fs.renameSync(metadataFile.path, targetMetadataPath);
+        console.log(`[Upload] Renamed metadata file to: ${path.basename(targetMetadataPath)}`);
+      }
+    }
+    
     const points = await parsePointCloudFile(filePath);
     
     if (points.length === 0) {
@@ -198,8 +240,8 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`FILE UPLOAD PROCESSING`);
     console.log(`${'='.repeat(60)}`);
-    console.log(`File: ${req.file.originalname}`);
-    console.log(`File size: ${(req.file.size / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`File: ${mainFile.originalname}`);
+    console.log(`File size: ${(mainFile.size / 1024 / 1024).toFixed(2)} MB`);
     console.log(`Total points parsed: ${points.length.toLocaleString()}`);
     console.log(`\nSettings:`);
     console.log(`  - Downsampling enabled: ${downsamplingEnabled}`);
@@ -246,7 +288,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     console.log(`${'='.repeat(60)}\n`);
     
     res.json({
-      filename: req.file.originalname,
+      filename: mainFile.originalname,
       fileId: path.basename(filePath),
       points: displayPoints,
       allPoints: points.length <= MAX_DISPLAY_POINTS ? points : null,
@@ -409,21 +451,12 @@ app.post('/api/check-metadata', (req, res) => {
     const inputBasename = path.basename(inputFile, path.extname(inputFile));
     const metadataFilePath = path.join(uploadDir, inputBasename + '.txt');
     
-    // Step 4: Check if metadata file exists
-    const metadataExists = fs.existsSync(metadataFilePath);
+    // Step 4: Use the readMetadata function to check and read metadata
+    // This ensures consistency with the PDF generation logic
+    const metadata = readMetadata(metadataFilePath);
+    const metadataExists = metadata !== null;
     
-    // Step 5: If metadata exists, read and return its content
-    let metadata = null;
-    if (metadataExists) {
-      try {
-        const content = fs.readFileSync(metadataFilePath, 'utf-8');
-        metadata = content.split('\n').filter(line => line.trim() !== '');
-      } catch (error) {
-        console.error('Error reading metadata:', error);
-      }
-    }
-    
-    // Step 6: Return response
+    // Step 5: Return response
     res.json({
       exists: metadataExists,
       metadataFilePath: metadataFilePath,
@@ -454,7 +487,7 @@ app.post('/api/check-metadata', (req, res) => {
  */
 app.post('/api/save-metadata', (req, res) => {
   try {
-    const { fileId, metadata } = req.body;
+    const { fileId, metadata, originalFilename } = req.body;
     
     // Validate request
     if (!fileId) {
@@ -519,10 +552,17 @@ app.post('/api/save-metadata', (req, res) => {
     
     console.log(`[Metadata] Saved metadata to: ${metadataFilePath}`);
     
+    // Determine user-friendly filename for the metadata file
+    const originalBase = originalFilename 
+      ? originalFilename.replace(/\.[^/.]+$/, '') // Remove extension
+      : inputBasename;
+    const metadataDisplayName = `${originalBase}_metadata.txt`;
+    
     // Step 5: Return success response
     res.json({
       success: true,
       metadataFilePath: metadataFilePath,
+      metadataDisplayName: metadataDisplayName,
       message: 'Metadata saved successfully'
     });
     
@@ -535,7 +575,7 @@ app.post('/api/save-metadata', (req, res) => {
 // Generate PDF report
 app.post('/api/generate-report', async (req, res) => {
   try {
-    const { fileId, originalFilename } = req.body;
+    const { fileId, originalFilename, projectName } = req.body;
     
     if (!fileId) {
       return res.status(400).json({ error: 'File ID is required' });
@@ -549,24 +589,38 @@ app.post('/api/generate-report', async (req, res) => {
     if (!fs.existsSync(inputFile)) {
       return res.status(404).json({ error: 'Input file not found' });
     }
+
+    // Read metadata from same directory as XYZ file
+    const xyzDir = path.dirname(inputFile);
+    const baseFilename = path.basename(fileId, path.extname(fileId));
+    const metadataPath = path.join(xyzDir, `${baseFilename}.txt`);
+
+    let metadata = {};
+    if (fs.existsSync(metadataPath)) {
+      metadata = readMetadata(metadataPath);
+      console.log('Metadata loaded from:', metadataPath);
+    } else {
+      console.log('No metadata file found at:', metadataPath);
+    }
     
-    // Generate output filename based on original filename
-    const baseFilename = originalFilename 
+    // Generate output filename based on original filename for better user experience
+    const originalBase = originalFilename 
       ? originalFilename.replace(/\.[^/.]+$/, '') // Remove extension
-      : 'pointcloud';
-    const outputFilename = `pointcloud_${baseFilename}.pdf`;
-    const outputFile = path.join(uploadDir, outputFilename);
+      : baseFilename;
+    const outputFilename = `${originalBase}_report.pdf`;
+    const outputFile = path.join(xyzDir, outputFilename);
     
     console.log('\n' + '='.repeat(60));
     console.log('PDF REPORT GENERATION REQUEST');
     console.log('='.repeat(60));
     console.log(`Input file: ${fileId}`);
     console.log(`Original filename: ${originalFilename}`);
+    console.log(`Metadata file: ${metadataPath}`);
     console.log(`Output file: ${outputFilename}`);
     console.log('='.repeat(60));
     
-    // Call JavaScript report generator
-    const result = await generateReport(inputFile, outputFile, originalFilename);
+    // Call JavaScript report generator with metadata
+    const result = await generateReport(inputFile, outputFile, originalFilename, projectName, metadata);
     
     if (!result.success) {
       console.error('Report generation failed:', result.error);
@@ -583,6 +637,7 @@ app.post('/api/generate-report', async (req, res) => {
     
     console.log('\n' + '='.repeat(60));
     console.log('PDF REPORT GENERATION COMPLETED');
+    console.log(`PDF saved to: ${outputFile}`);
     console.log('='.repeat(60) + '\n');
     
     // Send the PDF file

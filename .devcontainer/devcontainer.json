@@ -4,11 +4,13 @@
   "portsAttributes": {
     "3000": {
       "label": "React Client",
-      "onAutoForward": "notify"
+      "onAutoForward": "notify",
+      "visibility": "public"
     },
     "5000": {
       "label": "Express Server",
-      "onAutoForward": "notify"
+      "onAutoForward": "notify",
+      "visibility": "public"
     }
   }
 }
